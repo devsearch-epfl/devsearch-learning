@@ -34,7 +34,6 @@ class AstExtractorTest extends FlatSpec {
                                                                   |while(!asleep)
                                                                   |  sheep++""".stripMargin))
 
-    // Strange string concat because SPACE on 5th line is always deleted when saving in intelliJ.
   }
 
   it should "correctly parse this String containing one file" in {
