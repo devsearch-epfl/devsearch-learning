@@ -103,7 +103,7 @@ object AstExtractor {
           ret :+= snippet
         }
 
-        size = (line.split(':')(0)).toInt
+        size = line.split(':')(0).toInt
         snippet = line
       } else {
         snippet += ("\n" + line)
