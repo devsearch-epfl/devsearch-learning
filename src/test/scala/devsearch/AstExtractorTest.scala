@@ -29,8 +29,8 @@ class AstExtractorTest extends FlatSpec {
                                                                   |class ClassWithAConstructor {
                                                                   |  protected ClassWithAConstructor(int a, String b) throws This, AndThat, AndWhatElse {
                                                                   |  }
-                                                                  |}""".stripMargin,
-                                                               """25:Java/hubifant/another_repo/path/to/another/repo
+                                                                  |}""".stripMargin, """
+                                                                  |25:Java/hubifant/another_repo/path/to/another/repo
                                                                   |while(!asleep)
                                                                   |  sheep++""".stripMargin))
 

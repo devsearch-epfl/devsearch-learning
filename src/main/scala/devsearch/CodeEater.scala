@@ -1,7 +1,6 @@
 package devsearch
 
-import devsearch.ast._
-import devsearch.features._
+import devsearch.features.{CodeFileData, Feature, Features}
 import org.apache.spark.rdd.RDD
 
 /**
