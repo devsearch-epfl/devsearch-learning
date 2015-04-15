@@ -1,3 +1,9 @@
+import AssemblyKeys._  // put this at the top of the file
+
+assemblySettings
+
+
+
 name := "devsearch-learning"
 
 version := "0.1"
@@ -13,7 +19,7 @@ resolvers ++= Seq(
 
 libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.1.7" % "test",
-  "org.apache.spark" %% "spark-core" % "1.3.0"
+  "org.apache.spark" %% "spark-core" % "1.3.0" % "provided"
 )
 
 parallelExecution in Test := false

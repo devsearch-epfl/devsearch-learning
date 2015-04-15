@@ -63,7 +63,7 @@ object SnippetParser extends RegexParsers with java.io.Serializable {
   val number:  Parser[String] = """\d+""".r
   val noSlash: Parser[String] = """[^/]+""".r
   val path:    Parser[String] = """[^\n]+""".r                 //everything until eol
-  val code:    Parser[String] = """(?s).*[^\n\d+:]""".r        //everything until "\n897162346:"
+  val code:    Parser[String] = """(?s).*""".r        //everything until "\n897162346:"
 }
 
 
@@ -88,7 +88,7 @@ def showMatches(s: String, r: scala.util.matching.Regex): Unit = {
 
 object AstExtractor {
 
-  def toBlobSnippet(blob: (String, String)): List[String] = {
+  /*def toBlobSnippet(blob: (String, String)): List[String] = {
     val (path, content) = blob
     val lines = content.split('\n')
     var ret = List[String]()
@@ -115,15 +115,15 @@ object AstExtractor {
     ret :+= snippet
 
     ret
-  }
+  }*/
 
-  /*def toBlobSnippet(blob: (String, String)): List[String] = {
-    val snippet = """(?s).+?(?=(\n\d+:|\Z))""".r    //match everything until some "<NUMBER>:" or end of string
+  def toBlobSnippet(blob: (String, String)): List[String] = {
+    val snippet = """(?s).+?(?=(\n\d+:([a-zA-Z0-9]+/)|\Z))""".r    //match everything until some "<NUMBER>:" or end of string
     blob match {
       case (path, content) => snippet.findAllIn(content).toList
       case _               => List()
     }
-  }*/
+  }
 
   def toCodeFile(snippet: String): Option[CodeFile] = {
     val result = SnippetParser.parse(SnippetParser.parseBlob, snippet)
@@ -135,10 +135,9 @@ object AstExtractor {
    */
   def extract(path: String)(implicit sc: SparkContext): RDD[CodeFile] = {
     // type: RDD(path: String, file: String)
-    val rddBlobs = sc.wholeTextFiles(path+"/*")
 
-    //TODO: check if path is valid!
-    //TODO: uncompress files
+    val rddBlobs = sc.wholeTextFiles(path)
+
     rddBlobs flatMap toBlobSnippet flatMap toCodeFile
   }
 }
