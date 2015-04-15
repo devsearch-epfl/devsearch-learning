@@ -11,7 +11,8 @@ import org.apache.spark.{SparkConf, SparkContext}
 object FeatureMining {
 
   //TODO: SET PATH HERE!
-  val inputDir  = "/projects/devsearch/repositories/java/part-00144"
+  //val inputDir = "/projects/devsearch/repositories/*"
+  val inputDir  = "/projects/devsearch/testrepos/java"
   val outputDir = "/projects/devsearch/features"
 
 
@@ -20,7 +21,7 @@ object FeatureMining {
     implicit val sc = new SparkContext(conf)
     val codeFiles = AstExtractor extract inputDir
 
-    println("\n\n\n\n\n\n\n\nnbCodeFiles"+codeFiles.count()+"\n\n\n\n\n\n\n")
+    println("\n\n\n\n\n\n\n\nnbCodeFiles: "+codeFiles.count()+"\n\n\n\n\n\n\n")
 
     val features = CodeEater eat codeFiles
 
