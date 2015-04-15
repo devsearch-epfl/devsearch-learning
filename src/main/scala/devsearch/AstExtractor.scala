@@ -43,8 +43,8 @@ class ScalaFile(size: Long, owner: String, repository: String, path: String, cod
 
 object SnippetParser extends RegexParsers with java.io.Serializable {
   def parseBlob: Parser[CodeFile] = (
-    number~":Java/"~noSlash~"/"~noSlash~"/"~path~code ^^ {
-      case size~_~owner~_~repo~_~path~code => new JavaFile(size.toLong, owner, repo, path, code)
+    number~":..data/crawlid/java/"~noSlash~"/"~noSlash~"/"~path~code ^^ {
+      case size~_~owner~_~repo~_~path~code => new JavaFile(size.replace("\n", "").toLong, owner, repo, path, code)
     }
     //|number~":Python/"~noSlash~"/"~noSlash~"/"~path~code ^^ {
     //  case size~_~owner~_~repo~_~path~code => PythonFile(size, owner, repo, path, code)
@@ -60,10 +60,10 @@ object SnippetParser extends RegexParsers with java.io.Serializable {
     //}
   )
 
-  val number:  Parser[String] = """\d+""".r
+  val number:  Parser[String] = """[\n]?\d+""".r
   val noSlash: Parser[String] = """[^/]+""".r
   val path:    Parser[String] = """[^\n]+""".r                 //everything until eol
-  val code:    Parser[String] = """(?s).*""".r        //everything until "\n897162346:"
+  val code:    Parser[String] = """(?s).*""".r                 //ethe rest
 }
 
 
@@ -118,13 +118,14 @@ object AstExtractor {
   }*/
 
   def toBlobSnippet(blob: (String, String)): List[String] = {
-    val snippet = """(?s).+?(?=(\n\d+:([a-zA-Z0-9]+/)|\Z))""".r    //match everything until some "<NUMBER>:" or end of string
+    val snippet = """(?s).+?(?=(\n\d+:([a-zA-Z0-9\.]+/)|\Z))""".r    //match everything until some "<NUMBER>:" or end of string
     blob match {
       case (path, content) => snippet.findAllIn(content).toList
       case _               => List()
     }
   }
 
+  //TODO: this function is somehow broken.
   def toCodeFile(snippet: String): Option[CodeFile] = {
     val result = SnippetParser.parse(SnippetParser.parseBlob, snippet)
     if (result.isEmpty) None else Some(result.get)
@@ -137,7 +138,12 @@ object AstExtractor {
     // type: RDD(path: String, file: String)
 
     val rddBlobs = sc.wholeTextFiles(path)
+    val snippets = rddBlobs flatMap toBlobSnippet
 
-    rddBlobs flatMap toBlobSnippet flatMap toCodeFile
+    println("\n\n\n\n\n\n\n\n\tparsed BLOBs: "+rddBlobs.count() + "\n\tnbSnippets: "+snippets.count()+"\n\n\n\n\n\n\n")
+
+    val codeFiles = snippets flatMap toCodeFile
+
+    codeFiles
   }
 }

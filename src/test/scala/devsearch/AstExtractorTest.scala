@@ -16,21 +16,21 @@ class AstExtractorTest extends FlatSpec {
 
   "AstExtractor" should "correctly snip this String" in {
     val s =
-      """123:Java/samarion/repo-name/path/to/file
+      """123:..data/crawlid/java/samarion/repo-name/path/to/file
         |class ClassWithAConstructor {
         |  protected ClassWithAConstructor(int a, String b) throws This, AndThat, AndWhatElse {
         |  }
         |}
-        |25:Java/hubifant/another_repo/path/to/another/repo
+        |25:..data/crawlid/java/hubifant/another_repo/path/to/another/repo
         |while(!asleep)
         |  sheep++""".stripMargin
 
-    assert(AstExtractor.toBlobSnippet(("blob/path", s)) == List("""123:Java/samarion/repo-name/path/to/file
+    assert(AstExtractor.toBlobSnippet(("blob/path", s)) == List("""123:..data/crawlid/java/samarion/repo-name/path/to/file
                                                                   |class ClassWithAConstructor {
                                                                   |  protected ClassWithAConstructor(int a, String b) throws This, AndThat, AndWhatElse {
                                                                   |  }
                                                                   |}""".stripMargin, """
-                                                                  |25:Java/hubifant/another_repo/path/to/another/repo
+                                                                  |25:..data/crawlid/java/hubifant/another_repo/path/to/another/repo
                                                                   |while(!asleep)
                                                                   |  sheep++""".stripMargin))
 
@@ -38,11 +38,12 @@ class AstExtractorTest extends FlatSpec {
 
   it should "correctly parse this String containing one file" in {
     val s =
-      """9999:Java/samarion/repo-name/path/to/file
-         |class ClassWithAConstructor {
-         |  protected ClassWithAConstructor(int a, String b) throws This, AndThat, AndWhatElse {
-         |  }
-         |}""".stripMargin
+      """9999:..data/crawlid/java/samarion/repo-name/path/to/file
+        |class ClassWithAConstructor {
+        |  protected ClassWithAConstructor(int a, String b) throws This, AndThat, AndWhatElse {
+        |  }
+        |}
+        |""".stripMargin
     assert(AstExtractor.toCodeFile(s) == Some(new JavaFile(9999L, "samarion", "repo-name", "path/to/file", """
       |class ClassWithAConstructor {
       |  protected ClassWithAConstructor(int a, String b) throws This, AndThat, AndWhatElse {
