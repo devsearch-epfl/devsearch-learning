@@ -3,7 +3,7 @@ package devsearch
 import devsearch.ast._
 import devsearch.parsers._
 import devsearch.features._
-import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd._
 import org.apache.spark.{SparkConf, SparkContext}
 import scala.util.parsing.combinator._
 
@@ -77,6 +77,12 @@ object SnippetParser extends RegexParsers with java.io.Serializable {
 /* REPL helpers...
 
 
+  def matchString(s: String, r: scala.util.matching.Regex): Boolean = s match{
+    case r() => true
+    case _   => false
+  }
+
+
 def showMatches(s: String, r: scala.util.matching.Regex): Unit = {
      for (m <- r.findAllIn(s)) println (m+"\n-------------------------------------------------")
 }
@@ -95,13 +101,7 @@ object AstExtractor {
   }
 
 
-  /*
-  def matchString(s: String, r: scala.util.matching.Regex): Boolean = s match{
-    case r() => true
-    case _   => false
-  }
-
-  def toBlobSnippet(blob: (String, String)): List[String] = {
+  /*def toBlobSnippet(blob: (String, String)): List[String] = {
     val snippet = """(?s).+?(?=(\n\d+:([a-zA-Z0-9\.]+/)|\Z))""".r    //match everything until some "<NUMBER>:" or end of string
     blob match {
       case (path, content) => snippet.findAllIn(content).toList
@@ -134,17 +134,20 @@ object AstExtractor {
     val lines = sc.textFile(path)
     val indexedLines = lines.zipWithIndex()
 
+
     val fileHeaders = indexedLines.filter{case (line, _) => matchHeader(line)}.collect()
 
-    val bla = indexedLines.map{case (line, number) => ( binarySearch(number, fileHeaders),(line, number))}
+
+    val groupedLines = indexedLines.map{case (line, number) => ( binarySearch(number, fileHeaders),(line, number))}
+                                   .groupByKey()
 
 
-    val grouped = bla.groupByKey()
+    val snippets = groupedLines.mapValues(list => list.foldLeft(""){
+                                            case (acc, (line, _)) => acc ++ (line + "\n")})
+                               .values
 
-    val nameToContent = grouped.mapValues(list => list.foldLeft(""){case (acc, (line, _)) => acc ++ (line + "\n")})
 
-
-    val codeFiles = nameToContent.values flatMap toCodeFile
+    val codeFiles = snippets flatMap toCodeFile
 
 
     codeFiles
