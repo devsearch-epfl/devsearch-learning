@@ -42,8 +42,13 @@ class ScalaFile(size: Long, owner: String, repository: String, path: String, cod
 
 
 object SnippetParser extends RegexParsers with java.io.Serializable {
+  def someCode = """class ClassWithAConstructor {
+                   |  protected ClassWithAConstructor(int a, String b) throws This, AndThat, AndWhatElse {
+                   |  }
+                   |}
+                   |""".stripMargin
   def parseBlob: Parser[CodeFile] = (
-    number~":..data/crawlid/java/"~noSlash~"/"~noSlash~"/"~path~code ^^ {
+    number~":../data/crawld/java/"~noSlash~"/"~noSlash~"/"~path~code ^^ {
       case size~_~owner~_~repo~_~path~code => new JavaFile(size.replace("\n", "").toLong, owner, repo, path, code)
     }
     //|number~":Python/"~noSlash~"/"~noSlash~"/"~path~code ^^ {
@@ -71,11 +76,6 @@ object SnippetParser extends RegexParsers with java.io.Serializable {
 
 /* REPL helpers...
 
-def matchString(s: String, r: scala.util.matching.Regex): Boolean = s match{
-     case r() => true
-     case _   => false
-}
-
 
 def showMatches(s: String, r: scala.util.matching.Regex): Unit = {
      for (m <- r.findAllIn(s)) println (m+"\n-------------------------------------------------")
@@ -88,34 +88,18 @@ def showMatches(s: String, r: scala.util.matching.Regex): Unit = {
 
 object AstExtractor {
 
-  /*def toBlobSnippet(blob: (String, String)): List[String] = {
-    val (path, content) = blob
-    val lines = content.split('\n')
-    var ret = List[String]()
 
-    var size = 0
-    var snippet = ""
-    for(line <- lines) {
-      if (size <= 0){
+  def matchHeader(s: String): Boolean = {
+    val splitted = s.split(":")
+    splitted.size == 2 && splitted(0).forall(_.isDigit) && (splitted(1).split("/").length >= 7)
+  }
 
-        //add the snippet to the list...
-        if(snippet != ""){
-          ret :+= snippet
-        }
 
-        size = line.split(':')(0).toInt
-        snippet = line
-      } else {
-        snippet += ("\n" + line)
-        size -= (line.length + 1)     //chars on line + newline
-      }
-    }
-
-    //add the last snippet
-    ret :+= snippet
-
-    ret
-  }*/
+  /*
+  def matchString(s: String, r: scala.util.matching.Regex): Boolean = s match{
+    case r() => true
+    case _   => false
+  }
 
   def toBlobSnippet(blob: (String, String)): List[String] = {
     val snippet = """(?s).+?(?=(\n\d+:([a-zA-Z0-9\.]+/)|\Z))""".r    //match everything until some "<NUMBER>:" or end of string
@@ -123,26 +107,45 @@ object AstExtractor {
       case (path, content) => snippet.findAllIn(content).toList
       case _               => List()
     }
-  }
+  }*/
 
-  //TODO: this function is somehow broken.
   def toCodeFile(snippet: String): Option[CodeFile] = {
     val result = SnippetParser.parse(SnippetParser.parseBlob, snippet)
     if (result.isEmpty) None else Some(result.get)
   }
 
+
+  def binarySearch(lineNumber : Long, headerLines : Array[(String, Long)]) = {
+    def rec(lb : Int, ub :Int) : String = {
+      val mb = (lb + ub) /2
+      if(lb + 1 == ub) headerLines(lb)._1
+      else if(headerLines(mb)._2 >lineNumber) rec(lb, mb)
+      else rec(mb, ub)
+    }
+    rec(0, headerLines.size)
+  }
+
+
   /*
    * Argument: a path that leads to the language directories
    */
   def extract(path: String)(implicit sc: SparkContext): RDD[CodeFile] = {
-    // type: RDD(path: String, file: String)
 
-    val rddBlobs = sc.wholeTextFiles(path)
-    val snippets = rddBlobs flatMap toBlobSnippet
+    val lines = sc.textFile(path)
+    val indexedLines = lines.zipWithIndex()
 
-    println("\n\n\n\n\n\n\n\n\tparsed BLOBs: "+rddBlobs.count() + "\n\tnbSnippets: "+snippets.count()+"\n\n\n\n\n\n\n")
+    val fileHeaders = indexedLines.filter{case (line, _) => matchHeader(line)}.collect()
 
-    val codeFiles = snippets flatMap toCodeFile
+    val bla = indexedLines.map{case (line, number) => ( binarySearch(number, fileHeaders),(line, number))}
+
+
+    val grouped = bla.groupByKey()
+
+    val nameToContent = grouped.mapValues(list => list.foldLeft(""){case (acc, (line, _)) => acc ++ (line + "\n")})
+
+
+    val codeFiles = nameToContent.values flatMap toCodeFile
+
 
     codeFiles
   }
