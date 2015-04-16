@@ -20,8 +20,8 @@ object FeatureMining {
   //val outputDir = "/home/hubi/Documents/BigData/DevSearch/features"
 
   /**
-   * We need to process BLOB by BLOB because the header line of each file gets collected in AstExtractor.
-   * Since the BLOBs are so huge, it is still running in parallel.
+   * We need to process the BLOBs file by file because the header line of each BLOBsnippet gets collected in AstExtractor.
+   * Since the BLOBs are so huge this would cause problems if we extracted all BLOBs in parallel.
    * @param args
    */
   def main(args: Array[String]) {
@@ -29,6 +29,7 @@ object FeatureMining {
     implicit val sc = new SparkContext(conf)
 
 
+    //Go through each language directory and list all the contained BLOBs
     val fs = FileSystem.get(new java.net.URI(inputDir + "/*"), new Configuration())
     val fileList = fs.listStatus(new Path(inputDir))
                      .map(_.getPath)                    //these are all the language directories...
@@ -36,7 +37,7 @@ object FeatureMining {
                      .map(_.getPath.toString)
 
 
-
+    //process each BLOB
     for(inputFile <- fileList){
       println("\n\n\n\n\n\n\n\nProcessing "+ inputFile +"\n\n\n\n\n\n\n\n")
 

@@ -1,10 +1,9 @@
 package devsearch
 
-import devsearch.ast._
 import devsearch.parsers._
 import devsearch.features._
 import org.apache.spark.rdd._
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.SparkContext
 import scala.util.parsing.combinator._
 
 
@@ -42,11 +41,7 @@ class ScalaFile(size: Long, owner: String, repository: String, path: String, cod
 
 
 object SnippetParser extends RegexParsers with java.io.Serializable {
-  def someCode = """class ClassWithAConstructor {
-                   |  protected ClassWithAConstructor(int a, String b) throws This, AndThat, AndWhatElse {
-                   |  }
-                   |}
-                   |""".stripMargin
+
   def parseBlob: Parser[CodeFile] = (
     number~":../data/crawld/java/"~noSlash~"/"~noSlash~"/"~path~code ^^ {
       case size~_~owner~_~repo~_~path~code => new JavaFile(size.replace("\n", "").toLong, owner, repo, path, code)
@@ -94,7 +89,14 @@ def showMatches(s: String, r: scala.util.matching.Regex): Unit = {
 
 object AstExtractor {
 
-
+  /**
+   * A line is a header if...
+   *  - there is exactly one ':'
+   *  - there are only digits on the left side of the semicolon
+   *  - if there are more than 7 slashes
+   * @param s
+   * @return Boolean
+   */
   def matchHeader(s: String): Boolean = {
     val splitted = s.split(":")
     splitted.size == 2 && splitted(0).forall(_.isDigit) && (splitted(1).split("/").length >= 7)
@@ -109,6 +111,12 @@ object AstExtractor {
     }
   }*/
 
+
+  /**
+   * takes a BLOBsnippet and transforms it into a CodeFile
+   * @param snippet
+   * @return CodeFile
+   */
   def toCodeFile(snippet: String): Option[CodeFile] = {
     val result = SnippetParser.parse(SnippetParser.parseBlob, snippet)
     if (result.isEmpty) None else Some(result.get)
@@ -131,20 +139,22 @@ object AstExtractor {
    */
   def extract(path: String)(implicit sc: SparkContext): RDD[CodeFile] = {
 
+    //save the BLOB line by line and index the lines
     val lines = sc.textFile(path)
     val indexedLines = lines.zipWithIndex()
 
 
+    //identify and extract the first line of each BLOBsnippet. These headers must be collected because they are needed
+    //in the binarySearch function together with an other RDD .
     val fileHeaders = indexedLines.filter{case (line, _) => matchHeader(line)}.collect()
 
 
-    val groupedLines = indexedLines.map{case (line, number) => ( binarySearch(number, fileHeaders),(line, number))}
-                                   .groupByKey()
+    //put all lines between two header lines into the same group
+    val groupedLines = indexedLines.map{case (line, number) => ( binarySearch(number, fileHeaders),(line, number))}.groupBy(_._1)
 
 
-    val snippets = groupedLines.mapValues(list => list.foldLeft(""){
-                                            case (acc, (line, _)) => acc ++ (line + "\n")})
-                               .values
+    //put each group of lines together to a BLOBsnippet (format: <size>:../data/crawld/<language>/<owner>/<repo>/<path>\n<code>
+    val snippets = groupedLines.map(list => list._2.foldLeft(""){(acc, line) => acc ++ (line._2._1 + "\n")})
 
 
     val codeFiles = snippets flatMap toCodeFile
