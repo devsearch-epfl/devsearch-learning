@@ -45,7 +45,7 @@ object FeatureMining {
 
       val features = CodeEater eat codeFiles
 
-      println("\n\n\n\n\n\n\n\nGenerated "+features.count()+ " features from " + codeFiles.count + " files.\n\n\n\n\n\n\n\n")
+      //println("\n\n\n\n\n\n\n\nGenerated "+features.count()+ " features from " + codeFiles.count + " files.\n\n\n\n\n\n\n\n")
 
       features map(_.toString) saveAsTextFile(outputDir)
     }
