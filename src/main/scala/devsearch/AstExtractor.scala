@@ -125,9 +125,9 @@ object AstExtractor {
 
   def binarySearch(lineNumber : Long, headerLines : Array[(String, Long)]) = {
     def rec(lb : Int, ub :Int) : String = {
-      val mb = (lb + ub) /2
-      if(lb + 1 == ub) headerLines(lb)._1
-      else if(headerLines(mb)._2 >lineNumber) rec(lb, mb)
+      val mb = (lb + ub) / 2
+      if(lb + 1 == ub || lb == ub) headerLines(lb)._1
+      else if(headerLines(mb)._2 > lineNumber) rec(lb, mb)
       else rec(mb, ub)
     }
     rec(0, headerLines.size)
@@ -156,10 +156,7 @@ object AstExtractor {
     //put each group of lines together to a BLOBsnippet (format: <size>:../data/crawld/<language>/<owner>/<repo>/<path>\n<code>
     val snippets = groupedLines.map(list => list._2.foldLeft(""){(acc, line) => acc ++ (line._2._1 + "\n")})
 
-
-    val codeFiles = snippets flatMap toCodeFile
-
-
-    codeFiles
+    //println("\n\n\n\n\n\n\n\nExtracted "+snippets.count()+ " snippets.\n\n\n\n\n\n\n\n")
+    snippets flatMap toCodeFile
   }
 }
