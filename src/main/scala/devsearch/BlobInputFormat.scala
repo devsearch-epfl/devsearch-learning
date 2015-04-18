@@ -3,7 +3,7 @@ package devsearch
 /**
  * Created by hubi on 4/17/15.
  */
-import org.apache.hadoop.mapreduce.lib.input.{FileSplit, FileInputFormat};
+import org.apache.hadoop.mapreduce.lib.input.{FileSplit, FileInputFormat}
 import org.apache.hadoop.io.{Text}
 import org.apache.hadoop.mapreduce.{TaskAttemptContext, InputSplit, RecordReader}
 import org.apache.hadoop.fs.{Path, FileSystem, FSDataInputStream}
@@ -61,7 +61,9 @@ class BlobReader extends RecordReader[Text, Text]{
     println("\n\n\n\n\n\n\n\nInit BlobReader...\n\n\n\n\n\n\n\n")
     fileSplit  = split.asInstanceOf[FileSplit]
     path       = fileSplit.getPath
-    fileSystem = path.getFileSystem(context.getConfiguration)
+
+    //TODO: Strange error here! It looks like the two hadoop APIs would be mixed. But i don't do this... :-/
+    fileSystem = path.getFileSystem(context.getConfiguration())
   }
 
 

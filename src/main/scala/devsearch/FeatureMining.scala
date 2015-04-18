@@ -47,16 +47,17 @@ object FeatureMining {
       //Usually this kind of error occurs if an xml file does not begin correctly (<?xml...)
       // I guess, this is because the Configuration object is not initialized correctly...
 
-      
-      /*val conf = sc.hadoopConfiguration
-      //conf.addResource(new Path(inputFile))
-      //FileInputFormat.addInputPath(job, new Path(args[0]));
 
-      val test = sc.newAPIHadoopRDD(conf, classOf[BlobInputFormat], classOf[Text], classOf[Text])
+      val conf = new Configuration()
+      //conf.addResource(new Path(inputFile))
+      //conf.set("mapred.input.dir", inputFile)
+
+
+      val test = sc.newAPIHadoopFile(inputDir, classOf[BlobInputFormat], classOf[Text], classOf[Text])
 
       println("\n\n\n\n\n\n\n\nGenerated "+test.count()+ " snippets.\n\n\n\n\n\n\n\n")
-      */
 
+/*
 
       val codeFiles = AstExtractor extract inputFile
 
@@ -65,7 +66,7 @@ object FeatureMining {
       //println("\n\n\n\n\n\n\n\nGenerated "+features.count()+ " features from " + codeFiles.count + " files.\n\n\n\n\n\n\n\n")
 
       features map(_.toString) saveAsTextFile(outputDir)
-
+*/
 
     }
   }
