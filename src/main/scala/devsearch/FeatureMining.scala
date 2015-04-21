@@ -42,8 +42,8 @@ object FeatureMining {
    * Since the BLOBs are so huge this would cause problems if we extracted all BLOBs in parallel.
    */
   def main(args: Array[String]) {
-    val inputDir = "/Users/pierre/Documents/myfiles/EPFL/ProjetBigData/spark_input"
-    val outputDir = "/Users/pierre/Documents/myfiles/EPFL/ProjetBigData/spark_output/my_output"
+    val inputDir = "hdfs:///projects/devsearch/repositories/java"
+    val outputDir = "hdfs:///projects/devsearch/pwalch-features/test"
 
     println("Starting to mine")
     mine(inputDir, outputDir)
