@@ -1,6 +1,6 @@
 package devsearch
 
-import devsearch.features.{CodeFileData, Feature, Features}
+import devsearch.features.{FeatureRecognizer, CodeFileData, Feature}
 import org.apache.spark.rdd.RDD
 
 /**
@@ -19,6 +19,6 @@ object CodeEater {
    * Eats code and returns distinct features (no duplicates)
    */
   def eat(inputData: RDD[CodeFile]): RDD[Feature] = {
-    inputData map toCodeFileData flatMap Features
+    inputData map toCodeFileData flatMap FeatureRecognizer
   }
 }
