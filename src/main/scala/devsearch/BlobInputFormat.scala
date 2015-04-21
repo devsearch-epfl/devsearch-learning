@@ -81,7 +81,7 @@ class BlobReader extends RecordReader[Text, Text] {
     }
 
     // If we have a header, we take the content of this snippet
-    var lineAcc = "" + header + "\n"
+    var lineAcc = ""
     Stream.continually {
       lastLineRead = bufferedReader.readLine()
       lastLineRead
