@@ -30,12 +30,9 @@ object SnippetParser extends RegexParsers with java.io.Serializable {
 
 object AstExtractor {
   def extract(files: RDD[(Text, Text)]): RDD[CodeFileData] = {
-    val snippets = files.map {
+    files.map {
       case (headerLine, content) => headerLine + "\n" + content
-    }
-
-    //println("\n\n\n\n\n\n\n\nExtracted "+snippets.count()+ " snippets.\n\n\n\n\n\n\n\n")
-    snippets flatMap {
+    } flatMap {
       case snippet: String =>
         val result = SnippetParser.parse(SnippetParser.parseBlob, snippet)
         if (result.isEmpty) None
