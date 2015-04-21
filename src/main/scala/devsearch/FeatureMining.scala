@@ -10,7 +10,7 @@ object FeatureMining {
 
   //TODO: SET PATH TO CORRECT REPOSITORY DIRECTORY HERE!
   val inputDir = "/Users/pierre/Documents/myfiles/EPFL/ProjetBigData/spark_input"
-  val outputDir = "/Users/pierre/Documents/myfiles/EPFL/ProjetBigData/spark_output"
+  val outputDir = "/Users/pierre/Documents/myfiles/EPFL/ProjetBigData/spark_output/my_output"
 
   /**
    * We need to process the BLOBs file by file because the header line of each BLOBsnippet gets collected in AstExtractor.
@@ -30,27 +30,24 @@ object FeatureMining {
         .map(_.getPath.toString)
 
 
-    val initialRDD: RDD[(Text, Text)] = sc.emptyRDD[(Text, Text)]
-    val test = blobPathList.foldLeft(initialRDD)((acc, path) =>
+    val keyValueAccumulator: RDD[(Text, Text)] = sc.emptyRDD[(Text, Text)]
+    val fileRdd = blobPathList.foldLeft(keyValueAccumulator)((acc, path) =>
       sc.union(acc, sc.newAPIHadoopFile(path, classOf[BlobInputFormat], classOf[Text], classOf[Text]))
     )
 
-    println("Generated " + test.count + " snippets.")
-
+    fileRdd.flatMap {
+      case (key, value) => List(AstExtractor extrac)
+      case _ => List()
+    }
 
     //process each BLOB
-    /*for (inputFile <- blobPathList) {
+    for (inputFile <- blobPathList) {
       println("Processing " + inputFile)
-
-      println("Generated " + test.count() + " snippets.")
-
-      /*
-            val codeFiles = AstExtractor extract inputFile
-            val features = CodeEater eat codeFiles
-            //println("\n\n\n\n\n\n\n\nGenerated "+features.count()+ " features from " + codeFiles.count + " files.\n\n\n\n\n\n\n\n")
-            features map(_.toString) saveAsTextFile(outputDir)
-      */
-
-    }*/
+      println("Generated " + .count() + " snippets.")
+      val codeFiles = AstExtractor extract inputFile
+      val features = CodeEater eat codeFiles
+      //println("\n\n\n\n\n\n\n\nGenerated "+features.count()+ " features from " + codeFiles.count + " files.\n\n\n\n\n\n\n\n")
+      features map(_.toString) saveAsTextFile(outputDir)
+    }
   }
 }
