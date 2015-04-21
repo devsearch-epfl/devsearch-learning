@@ -1,9 +1,9 @@
 package devsearch
 
 import org.apache.hadoop.mapreduce.lib.input.{FileSplit, FileInputFormat}
-import org.apache.hadoop.io.{Text}
+import org.apache.hadoop.io.Text
 import org.apache.hadoop.mapreduce.{TaskAttemptContext, InputSplit, RecordReader}
-import org.apache.hadoop.fs.{Path, FileSystem, FSDataInputStream}
+import org.apache.hadoop.fs.{Path, FileSystem}
 import org.apache.commons.io.IOUtils
 import java.io.{BufferedReader, InputStreamReader}
 
@@ -22,10 +22,6 @@ class BlobReader extends RecordReader[Text, Text] {
   var currHeader = ""
   var currFile = ""
 
-  var fileSplit: FileSplit = _
-  var fileSystem: FileSystem = _
-  var path: Path = _
-
   var bufferedReader: BufferedReader = _
 
   private def matchHeader(s: String): Boolean = {
@@ -38,13 +34,14 @@ class BlobReader extends RecordReader[Text, Text] {
   }
 
   override def initialize(split: InputSplit, context: TaskAttemptContext): Unit = {
-    fileSplit = split.asInstanceOf[FileSplit]
-    path = fileSplit.getPath
+    val firstSplit = split.asInstanceOf[FileSplit]
+    val path = firstSplit.getPath
+    val fileSystem = path.getFileSystem(context.getConfiguration())
 
     println("Init BlobReader at path: " + path)
 
     //TODO: Strange error here! It looks like the two hadoop APIs would be mixed. But i don't do this... :-/
-    fileSystem = path.getFileSystem(context.getConfiguration())
+    bufferedReader = new BufferedReader(new InputStreamReader(fileSystem.open(path)))
   }
 
   /**
@@ -52,8 +49,6 @@ class BlobReader extends RecordReader[Text, Text] {
    */
   override def nextKeyValue(): Boolean = {
     try {
-      bufferedReader = new BufferedReader(new InputStreamReader(fileSystem.open(path)))
-
       currFile = ""
       Stream.continually(bufferedReader.readLine())
           .takeWhile(l => l != null && !matchHeader(l)) //take all the lines until the next header or eof
