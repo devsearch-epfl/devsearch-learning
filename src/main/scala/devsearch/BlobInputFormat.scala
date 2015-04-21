@@ -1,15 +1,18 @@
 package devsearch
 
+import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.lib.input.{FileSplit, FileInputFormat}
-import org.apache.hadoop.io.Text
-import org.apache.hadoop.mapreduce.{TaskAttemptContext, InputSplit, RecordReader}
-import org.apache.hadoop.fs.{Path, FileSystem}
+import org.apache.hadoop.io.{LongWritable, Text}
+import org.apache.hadoop.mapreduce.{JobContext, TaskAttemptContext, InputSplit, RecordReader}
 import org.apache.commons.io.IOUtils
 import java.io.{BufferedReader, InputStreamReader}
 
 
 class BlobInputFormat extends FileInputFormat[Text, Text] {
-  def createRecordReader(split: InputSplit, context: TaskAttemptContext): RecordReader[Text, Text] = new BlobReader
+  override def createRecordReader(split: InputSplit, context: TaskAttemptContext): BlobReader =
+    new BlobReader
+
+  override def isSplitable(context: JobContext, filename: Path): Boolean = false
 }
 
 /**
@@ -17,16 +20,27 @@ class BlobInputFormat extends FileInputFormat[Text, Text] {
  */
 class BlobReader extends RecordReader[Text, Text] {
   var key = new Text("")
-  var value = new Text("")
+  var currentBlobSnippet = new Text("")
   var processed = false
-  var currHeader = ""
-  var currFile = ""
 
   var bufferedReader: BufferedReader = _
 
   private def matchHeader(s: String): Boolean = {
-    val splitted = s.split(":")
-    splitted.size == 2 && splitted(0).forall(_.isDigit) && (splitted(1).split("/").length >= 7)
+    val splittedLine = s.split(":")
+    if (splittedLine.length != 2) {
+      return false
+    }
+
+    val fileLength = splittedLine(0)
+    val headerRest = splittedLine(1)
+    val splittedRest = headerRest.split("/")
+
+    if (splittedRest.length <= 6) {
+      return false
+    }
+
+    return splittedRest(0) == ".." && splittedRest(1) == "data" && splittedRest(2) == "crawld" &&
+        fileLength.forall(_.isDigit)
   }
 
   override def close(): Unit = {
@@ -49,29 +63,38 @@ class BlobReader extends RecordReader[Text, Text] {
    */
   override def nextKeyValue(): Boolean = {
     try {
-      currFile = ""
-      Stream.continually(bufferedReader.readLine())
-          .takeWhile(l => l != null && !matchHeader(l)) //take all the lines until the next header or eof
-          .foreach((l: String) => currFile += l) //concat the lines together
+      val header = bufferedReader.readLine()
 
-      if (currFile.isEmpty) {
+      // If we don't have any header, then we reached the end of the blob
+      if (header == Nil) {
         processed = true
         return false
       }
 
-      key.set(new Text("bla"))
-      value.set(new Text(currFile))
+      var lineAcc = "" + header + "\n"
 
+      // If we have a header, we take the content of this snippet
+      Stream.continually(bufferedReader.readLine())
+          // Take all the lines until the next header (excluded) or EOF
+          .takeWhile(l => l != null && !matchHeader(l))
+          // Add line to accumulator
+          .foreach(l => lineAcc += l + "\n")
+
+      key.set(new Text("bla"))
+      currentBlobSnippet.set(new Text(lineAcc))
+
+      lineAcc = ""
+      return true
     } catch {
       case e: Exception => e.printStackTrace
     }
 
-    return true
+    return false
   }
 
-  def getCurrentKey: Text = key
+  override def getCurrentKey: Text = key
 
-  def getCurrentValue: Text = value
+  override def getCurrentValue: Text = currentBlobSnippet
 
-  def getProgress: Float = if (processed) 1.0f else 0.0f
+  override def getProgress: Float = if (processed) 1.0f else 0.0f
 }
