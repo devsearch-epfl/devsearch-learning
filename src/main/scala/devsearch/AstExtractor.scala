@@ -50,18 +50,6 @@ object SnippetParser extends RegexParsers with java.io.Serializable {
 }
 
 object AstExtractor {
-
-  /**
-   * A line is a header if...
-   * - there is exactly one ':'
-   * - there are only digits on the left side of the semicolon
-   * - if there are more than 7 slashes
-   */
-  def matchHeader(s: String): Boolean = {
-    val splitted = s.split(":")
-    splitted.size == 2 && splitted(0).forall(_.isDigit) && (splitted(1).split("/").length >= 7)
-  }
-
   /**
    * Takes a BLOBsnippet and transforms it into a CodeFile
    */
@@ -90,8 +78,8 @@ object AstExtractor {
     val indexedLines = lines.zipWithIndex()
 
     //identify and extract the first line of each BLOBsnippet. These headers must be collected because they are needed
-    //in the binarySearch function together with an other RDD .
-    val fileHeaders = indexedLines.filter { case (line, _) => matchHeader(line) }.collect()
+    //in the binarySearch function together with an other RDD.
+    val fileHeaders = indexedLines.filter { case (line, _) => HeaderMatcher.isMatching(line) }.collect()
 
     //put all lines between two header lines into the same group
     val groupedLines = indexedLines.map { case (line, number) => (binarySearch(number, fileHeaders), (line, number)) }.groupBy(_._1)
