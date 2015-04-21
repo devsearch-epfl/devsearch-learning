@@ -62,8 +62,8 @@ object SnippetParser extends RegexParsers with java.io.Serializable {
 
   val number:  Parser[String] = """\d+""".r
   val noSlash: Parser[String] = """[^/]+""".r
-  val path:    Parser[String] = """[^\n]+""".r                 //everything until eol
-  val code:    Parser[String] = """(?s).*[^\n\d+:]""".r        //everything until "\n897162346:"
+  val path:    Parser[String] = """[^\n]+""".r        // everything until eol
+  val code:    Parser[String] = """(?s).*""".r        // rest of the string
 }
 
 

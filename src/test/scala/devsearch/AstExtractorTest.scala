@@ -37,6 +37,29 @@ class AstExtractorTest extends FlatSpec {
     // Strange string concat because SPACE on 5th line is always deleted when saving in intelliJ.
   }
 
+  it should "not fail in the presence of an \\n:[\\d+] sequence in the code" in {
+      val s =
+        """133:Java/samarion/repo-name/path/to/file
+          |class ClassWithAConstructor {
+          |  protected ClassWithAConstructor(int a, String b) throws This, AndThat, AndWhatElse {
+          |123:fail!
+          |  }
+          |}
+          |25:Java/hubifant/another_repo/path/to/another/repo
+          |while(!asleep)
+          |  sheep++""".stripMargin
+
+    assert(AstExtractor.toBlobSnippet(("blob/path", s)) == List("""133:Java/samarion/repo-name/path/to/file
+                                                                  |class ClassWithAConstructor {
+                                                                  |  protected ClassWithAConstructor(int a, String b) throws This, AndThat, AndWhatElse {
+                                                                  |123:fail!
+                                                                  |  }
+                                                                  |}""".stripMargin,
+                                                               """|25:Java/hubifant/another_repo/path/to/another/repo
+                                                                  |while(!asleep)
+                                                                  |  sheep++""".stripMargin))
+  }
+
   it should "correctly parse this String containing one file" in {
     val s =
       """9999:Java/samarion/repo-name/path/to/file
