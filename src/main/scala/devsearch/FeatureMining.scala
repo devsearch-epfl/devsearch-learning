@@ -1,5 +1,6 @@
 package devsearch
 
+import devsearch.features.CodeFileData
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.hadoop.conf.Configuration
@@ -31,23 +32,30 @@ object FeatureMining {
 
 
     val keyValueAccumulator: RDD[(Text, Text)] = sc.emptyRDD[(Text, Text)]
-    val fileRdd = blobPathList.foldLeft(keyValueAccumulator)((acc, path) =>
+    val files = blobPathList.foldLeft(keyValueAccumulator)((acc, path) =>
       sc.union(acc, sc.newAPIHadoopFile(path, classOf[BlobInputFormat], classOf[Text], classOf[Text]))
     )
 
-    fileRdd.flatMap {
-      case (key, value) => List(AstExtractor extrac)
-      case _ => List()
+    val codeFiles = AstExtractor.extract(files)
+
+    codeFiles.foreach {
+      case codeFile: CodeFileData =>
+        val location = codeFile.location
+        println(codeFile.language + ":" + location.user + "/" + location.repoName + location.fileName + ":" + codeFile.ast)
     }
 
+//    val features = CodeEater.eat(codeFiles)
+//
+//    features.flatMap(_.toString).saveAsTextFile(outputDir)
+
     //process each BLOB
-    for (inputFile <- blobPathList) {
-      println("Processing " + inputFile)
-      println("Generated " + .count() + " snippets.")
-      val codeFiles = AstExtractor extract inputFile
-      val features = CodeEater eat codeFiles
-      //println("\n\n\n\n\n\n\n\nGenerated "+features.count()+ " features from " + codeFiles.count + " files.\n\n\n\n\n\n\n\n")
-      features map(_.toString) saveAsTextFile(outputDir)
-    }
+//    for (inputFile <- blobPathList) {
+//      println("Processing " + inputFile)
+//      println("Generated " + .count() + " snippets.")
+//      val codeFiles = AstExtractor extract inputFile
+//      val features = CodeEater eat codeFiles
+//      //println("\n\n\n\n\n\n\n\nGenerated "+features.count()+ " features from " + codeFiles.count + " files.\n\n\n\n\n\n\n\n")
+//      features map(_.toString) saveAsTextFile(outputDir)
+//    }
   }
 }

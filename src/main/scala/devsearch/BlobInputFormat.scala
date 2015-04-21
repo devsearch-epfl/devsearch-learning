@@ -91,10 +91,8 @@ class BlobReader extends RecordReader[Text, Text] {
     // Add line to accumulator
     .foreach(l => lineAcc += l + "\n")
 
-    key.set(new Text("bla"))
+    key.set(new Text(header.asInstanceOf[String]))
     currentBlobSnippet.set(new Text(lineAcc))
-
-    lineAcc = ""
     return true
   }
 
