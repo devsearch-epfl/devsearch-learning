@@ -1,5 +1,6 @@
 package devsearch
 
+import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -21,18 +22,25 @@ object FeatureMining {
 
     // Go through each language directory and list all the contained BLOBs
     val fs = FileSystem.get(new java.net.URI(inputDir + "/*"), new Configuration())
-    val fileList = fs.listStatus(new Path(inputDir))
+    val blobPathList = fs.listStatus(new Path(inputDir))
         // Language directories
         .map(_.getPath)
         // Files in the language directories
         .flatMap(p => fs.listStatus(p))
         .map(_.getPath.toString)
 
-    //process each BLOB
-    for (inputFile <- fileList) {
-      println("Processing " + inputFile)
 
-      val test = sc.newAPIHadoopFile(inputDir, classOf[BlobInputFormat], classOf[Text], classOf[Text])
+    val initialRDD: RDD[(Text, Text)] = sc.emptyRDD[(Text, Text)]
+    val test = blobPathList.foldLeft(initialRDD)((acc, path) =>
+      sc.union(acc, sc.newAPIHadoopFile(path, classOf[BlobInputFormat], classOf[Text], classOf[Text]))
+    )
+
+    println("Generated " + test.count + " snippets.")
+
+
+    //process each BLOB
+    /*for (inputFile <- blobPathList) {
+      println("Processing " + inputFile)
 
       println("Generated " + test.count() + " snippets.")
 
@@ -43,6 +51,6 @@ object FeatureMining {
             features map(_.toString) saveAsTextFile(outputDir)
       */
 
-    }
+    }*/
   }
 }
