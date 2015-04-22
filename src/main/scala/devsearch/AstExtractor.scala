@@ -32,11 +32,10 @@ object AstExtractor {
   def extract(files: RDD[(Text, Text)]): RDD[CodeFileData] = {
     files.map {
       case (headerLine, content) => headerLine + "\n" + content
-    } flatMap {
-      case snippet: String =>
-        val result = SnippetParser.parse(SnippetParser.parseBlob, snippet)
-        if (result.isEmpty) None
-        else Some(result.get)
+    } flatMap { snippet: String =>
+      val result = SnippetParser.parse(SnippetParser.parseBlob, snippet)
+      if (result.isEmpty) None
+      else Some(result.get)
     }
   }
 }
