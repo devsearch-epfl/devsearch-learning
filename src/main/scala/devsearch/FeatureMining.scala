@@ -1,7 +1,7 @@
 package devsearch
 
 import devsearch.ast.Empty.NoDef
-import devsearch.features.{FeatureRecognizer, CodeFileData}
+import devsearch.features.{Feature, FeatureRecognizer, CodeFileData}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.hadoop.conf.Configuration
@@ -11,7 +11,7 @@ import org.apache.hadoop.io.Text
 object FeatureMining {
 
   def mine(inputDir: String, outputDir: String) {
-    val conf = new SparkConf().setAppName("FeatureMining").setMaster("local[2]")
+    val conf = new SparkConf().setAppName("FeatureMining")
     implicit val sc = new SparkContext(conf)
 
     // Go through each language directory and list all the contained blobs
@@ -24,9 +24,10 @@ object FeatureMining {
         .map(_.getPath.toString)
 
     // Use custom input format to get header/snippet pairs from part files
-    val headerSnippetAcc: RDD[(Text, Text)] = sc.emptyRDD[(Text, Text)]
-    val headerSnippetPairs = blobPathList.foldLeft(headerSnippetAcc)((acc, path) =>
-      sc.union(acc, sc.newAPIHadoopFile(path, classOf[BlobInputFormat], classOf[Text], classOf[Text]))
+    val headerSnippetPairs = sc.union(
+      blobPathList.map(path =>
+      sc.newAPIHadoopFile(path, classOf[BlobInputFormat], classOf[Text], classOf[Text])
+      )
     )
 
     // Generate code files and remove those that don't have an AST
