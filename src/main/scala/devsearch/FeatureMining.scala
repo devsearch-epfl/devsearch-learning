@@ -1,8 +1,7 @@
 package devsearch
 
 import devsearch.ast.Empty.NoDef
-import devsearch.features.{Feature, FeatureRecognizer, CodeFileData}
-import org.apache.spark.rdd.RDD
+import devsearch.features.FeatureRecognizer
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -43,11 +42,18 @@ object FeatureMining {
    * Since the BLOBs are so huge this would cause problems if we extracted all BLOBs in parallel.
    */
   def main(args: Array[String]) {
-    val inputDir = "hdfs:///projects/devsearch/repositories/java"
-    val outputDir = "hdfs:///projects/devsearch/pwalch-features/test"
+    if (args.length != 2) {
+      println("Invalid arguments. Args are: input_dir output_dir")
+      return
+    }
+    // val javaInputDir = "hdfs:///projects/devsearch/pwalch/usable_repos/java"
+    // val javaOutputDir = "hdfs:///projects/devsearch/pwalch/features/java"
 
-    println("Starting to mine")
-    mine(inputDir, outputDir)
+    val inputDir = args(0)
+    val outputDir = args(1)
+
+    mine(inputDir, outputDir);
+
     println("Mining done")
   }
 }
