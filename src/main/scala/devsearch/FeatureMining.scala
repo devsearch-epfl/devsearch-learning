@@ -1,6 +1,5 @@
 package devsearch
 
-import devsearch.ast.Empty.NoDef
 import devsearch.features.FeatureRecognizer
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.hadoop.conf.Configuration
@@ -30,7 +29,7 @@ object FeatureMining {
     )
 
     // Generate code files and remove those that don't have an AST
-    val codeFiles = AstExtractor.extract(headerSnippetPairs).filter(c => c.ast != NoDef)
+    val codeFiles = AstExtractor.extract(headerSnippetPairs)
 
     // Extract and store features
     val features = codeFiles.flatMap(FeatureRecognizer)
@@ -51,7 +50,6 @@ object FeatureMining {
 
     val inputDir = args(0)
     val outputDir = args(1)
-
     mine(inputDir, outputDir);
 
     println("Mining done")
