@@ -6,8 +6,8 @@ import org.apache.hadoop.io.Text
 import org.apache.spark.rdd._
 import scala.util.parsing.combinator._
 
-case class NoAstCodeFile(metadata: CodeFileMetadata, content: Text) extends java.io.Serializable
 case class CodeFileMetadata(size: Long, language: String, codeFileLocation: CodeFileLocation) extends java.io.Serializable
+case class NoAstCodeFile(metadata: CodeFileMetadata, content: Text) extends java.io.Serializable
 
 object HeaderParser extends RegexParsers with java.io.Serializable {
   val number: Parser[String] = """[\n]?\d+""".r
@@ -15,17 +15,21 @@ object HeaderParser extends RegexParsers with java.io.Serializable {
   val pathRegex: Parser[String] = """[^\n]+""".r
 
   def parseBlob: Parser[CodeFileMetadata] = (
-    number ~ ":../data/crawld/java/" ~ noSlashRegex ~ "/" ~ noSlashRegex ~ "/" ~ pathRegex ^^ {
-        case size ~ _ ~ owner ~ _ ~ repo ~ _ ~ path =>
-          CodeFileMetadata(size.replace("\n", "").toLong, "Java", CodeFileLocation(owner, repo, path))
+    number ~ ":../data/crawld/go/" ~ noSlashRegex ~ "/" ~ noSlashRegex ~ "/" ~ pathRegex ^^ {
+      case size ~ _ ~ owner ~ _ ~ repo ~ _ ~ path =>
+        CodeFileMetadata(size.replace("\n", "").toLong, "Go", CodeFileLocation(owner, repo, path))
     }
-    | number ~ ":Go/" ~ noSlashRegex ~ "/" ~ noSlashRegex ~ "/" ~ pathRegex ^^ {
-        case size ~ _ ~ owner ~ _ ~ repo ~ _ ~ path =>
-          CodeFileMetadata(size.toLong, "Go", CodeFileLocation(owner, repo, path))
+    | number ~ ":../data/crawld/java/" ~ noSlashRegex ~ "/" ~ noSlashRegex ~ "/" ~ pathRegex ^^ {
+      case size ~ _ ~ owner ~ _ ~ repo ~ _ ~ path =>
+        CodeFileMetadata(size.replace("\n", "").toLong, "Java", CodeFileLocation(owner, repo, path))
     }
-    | number ~ ":Scala/" ~ noSlashRegex ~ "/" ~ noSlashRegex ~ "/" ~ pathRegex ^^ {
-        case size ~ _ ~ owner ~ _ ~ repo ~ _ ~ path =>
-          CodeFileMetadata(size.toLong, "Scala", CodeFileLocation(owner, repo, path))
+    | number ~ ":../data/crawld/javascript/" ~ noSlashRegex ~ "/" ~ noSlashRegex ~ "/" ~ pathRegex ^^ {
+      case size ~ _ ~ owner ~ _ ~ repo ~ _ ~ path =>
+        CodeFileMetadata(size.replace("\n", "").toLong, "JavaScript", CodeFileLocation(owner, repo, path))
+    }
+    | number ~ ":../data/crawld/scala/" ~ noSlashRegex ~ "/" ~ noSlashRegex ~ "/" ~ pathRegex ^^ {
+      case size ~ _ ~ owner ~ _ ~ repo ~ _ ~ path =>
+        CodeFileMetadata(size.replace("\n", "").toLong, "Scala", CodeFileLocation(owner, repo, path))
     }
   )
 }
