@@ -8,8 +8,8 @@ import org.apache.hadoop.io.Text
 
 object FeatureMining {
 
-  def mine(inputDir: String, outputDir: String) {
-    val conf = new SparkConf().setAppName("FeatureMining")
+  def mine(inputDir: String, outputDir: String, jobName: String) {
+    val conf = new SparkConf().setAppName(jobName)
     implicit val sc = new SparkContext(conf)
 
     // Go through each language directory and list all the contained blobs
@@ -41,18 +41,20 @@ object FeatureMining {
    * Since the BLOBs are so huge this would cause problems if we extracted all BLOBs in parallel.
    */
   def main(args: Array[String]) {
-    if (args.length != 2) {
-      println("Invalid arguments. Args are: input_dir output_dir")
+    if (args.length != 3) {
+      println("Invalid arguments. Args are: input_dir output_dir job_name")
       return
     }
     // val javaInputDir = "hdfs:///projects/devsearch/pwalch/usable_repos/java"
     // val javaOutputDir = "hdfs:///projects/devsearch/pwalch/features/java"
+    // val javaJobName = "devsearch_JavaFeatureMining"
 
     val inputDir = args(0)
     val outputDir = args(1)
+    val jobName = args(2);
 
     val inputDirNoSlash = inputDir.replaceAll("/$", "")
-    mine(inputDirNoSlash, outputDir);
+    mine(inputDirNoSlash, outputDir, jobName);
 
     println("Mining done")
   }
