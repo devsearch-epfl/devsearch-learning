@@ -24,7 +24,7 @@ object FeatureMining {
     // Use custom input format to get header/snippet pairs from part files
     val headerSnippetPairs = sc.union(
       blobPathList.map(path =>
-      sc.newAPIHadoopFile(path, classOf[BlobInputFormat], classOf[Text], classOf[Text])
+        sc.newAPIHadoopFile(path, classOf[BlobInputFormat], classOf[Text], classOf[Text])
       )
     )
 
@@ -50,7 +50,9 @@ object FeatureMining {
 
     val inputDir = args(0)
     val outputDir = args(1)
-    mine(inputDir, outputDir);
+
+    val inputDirNoSlash = inputDir.replaceAll("/$", "")
+    mine(inputDirNoSlash, outputDir);
 
     println("Mining done")
   }
