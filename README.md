@@ -28,7 +28,7 @@ The FeatureMining class extracts features from miniblobs. It processes them indi
 
 * Put files back on HDFS
     * `hadoop fs -mkdir /projects/devsearch/pwalch/usable_repos/java`
-    * `hadoop fs -put miniblobs/part-00* /projects/devsearch/pwalch/usable_repos/java`
+    * `hadoop fs -put miniblobs/part-* /projects/devsearch/pwalch/usable_repos/java`
 
 ## Extract features from miniblobs
 
@@ -37,5 +37,5 @@ The FeatureMining class extracts features from miniblobs. It processes them indi
 	* Rename the generated file to `learning.jar` 
 
 * Run Spark feature extractor
-    * `spark-submit --num-executors 25 --class devsearch.FeatureMining --master yarn-client learning.jar "hdfs:///projects/devsearch/pwalch/usable_repos/java" "hdfs:///projects/devsearch/pwalch/features/java" > spark_all_log.txt 2>&1`
+    * `spark-submit --num-executors 25 --class devsearch.FeatureMining --master yarn-client learning.jar "hdfs:///projects/devsearch/pwalch/usable_repos/java" "hdfs:///projects/devsearch/pwalch/features/java" devsearch_JavaCodeMining > spark_all_log.txt 2>&1`
 
