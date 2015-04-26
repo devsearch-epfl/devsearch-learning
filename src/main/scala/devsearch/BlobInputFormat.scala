@@ -1,10 +1,11 @@
 package devsearch
 
+import devsearch.parsers.Languages
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.lib.input.{FileSplit, FileInputFormat}
 import org.apache.hadoop.io.Text
 import org.apache.hadoop.mapreduce.{JobContext, TaskAttemptContext, InputSplit, RecordReader}
-import org.apache.commons.io.IOUtils
+import org.apache.commons.io.{FilenameUtils, IOUtils}
 import java.io.{BufferedReader, InputStreamReader}
 
 
@@ -39,6 +40,9 @@ object HeaderMatcher {
  * The BlobReader goes through a BLOB line by line and returns all contained BLOBsnippets.
  */
 class BlobReader extends RecordReader[Text, Text] {
+  val MEGABYTES = Math.pow(2, 20)
+  val MAX_FILE_SIZE = 2 * MEGABYTES
+
   var key = new Text("")
   var currentBlobSnippet = new Text("")
   var processed = false
@@ -55,9 +59,6 @@ class BlobReader extends RecordReader[Text, Text] {
     val path = firstSplit.getPath
     val fileSystem = path.getFileSystem(context.getConfiguration())
 
-    println("Init BlobReader at path: " + path)
-
-    //TODO: Strange error here! It looks like the two hadoop APIs would be mixed. But i don't do this... :-/
     bufferedReader = new BufferedReader(new InputStreamReader(fileSystem.open(path)))
   }
 
@@ -80,6 +81,19 @@ class BlobReader extends RecordReader[Text, Text] {
       return false
     }
 
+    // We verify that we need to parse the following file
+    val parsedHeader = HeaderParser.parse(HeaderParser.parseBlobHeader, header.toString)
+    var needToParse = true
+    if (!parsedHeader.isEmpty) {
+      val metadata = parsedHeader.get
+      val extensionMatchesLanguage = Languages.extension(metadata.language) ==
+          FilenameUtils.getExtension(metadata.codeFileLocation.fileName)
+
+      if (metadata.size >= MAX_FILE_SIZE || !extensionMatchesLanguage) {
+        needToParse = false
+      }
+    }
+
     // If we have a header, we take the content of this snippet
     var lineAcc = ""
     Stream.continually {
@@ -88,12 +102,12 @@ class BlobReader extends RecordReader[Text, Text] {
     }
     // Take all the lines until the next header (excluded) or EOF
     .takeWhile(l => l != null && !HeaderMatcher.isMatching(l))
-    // Add line to accumulator
-    .foreach(l => lineAcc += l + "\n")
+    .foreach(l => if(needToParse) lineAcc += l + "\n")
 
-    key.set(new Text(header.asInstanceOf[String]))
+    key.set(new Text(header.toString))
     currentBlobSnippet.set(new Text(lineAcc))
-    return true
+
+    true
   }
 
   override def getCurrentKey: Text = key
