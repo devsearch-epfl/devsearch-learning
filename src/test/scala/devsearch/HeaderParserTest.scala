@@ -1,12 +1,13 @@
 package devsearch
 
 import devsearch.features.CodeFileLocation
+import devsearch.parsers.Languages
 import org.scalatest.FlatSpec
 
 class HeaderParserTest extends FlatSpec {
   "Header parser" should "parse correct string" in {
     val header = "15466:../data/crawld/java/acrobot/chestshop-3/src/main/java/com/lennardf1989/bukkitex/Database.java"
-    val result = HeaderParser.parse(HeaderParser.parseBlob, header)
+    val result = HeaderParser.parse(HeaderParser.parseBlobHeader, header)
 
     val headerResult = {
       if (result.isEmpty) None
@@ -17,7 +18,7 @@ class HeaderParserTest extends FlatSpec {
       headerResult ==
       CodeFileMetadata(
         15466,
-        "Java",
+        Languages.Java,
         CodeFileLocation("acrobot", "chestshop-3",
           "src/main/java/com/lennardf1989/bukkitex/Database.java"
         )

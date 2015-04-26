@@ -2,6 +2,8 @@ package devsearch
 
 import devsearch.ast.Empty.NoDef
 import devsearch.features._
+import devsearch.parsers.Languages
+import org.apache.commons.io.FilenameUtils
 import org.apache.hadoop.io.Text
 import org.apache.spark.rdd._
 import scala.util.parsing.combinator._
@@ -14,22 +16,22 @@ object HeaderParser extends RegexParsers with java.io.Serializable {
   val noSlashRegex: Parser[String] = """[^/]+""".r
   val pathRegex: Parser[String] = """[^\n]+""".r
 
-  def parseBlob: Parser[CodeFileMetadata] = (
+  def parseBlobHeader: Parser[CodeFileMetadata] = (
     number ~ ":../data/crawld/go/" ~ noSlashRegex ~ "/" ~ noSlashRegex ~ "/" ~ pathRegex ^^ {
       case size ~ _ ~ owner ~ _ ~ repo ~ _ ~ path =>
-        CodeFileMetadata(size.replace("\n", "").toLong, "Go", CodeFileLocation(owner, repo, path))
+        CodeFileMetadata(size.replace("\n", "").toLong, Languages.Go, CodeFileLocation(owner, repo, path))
     }
     | number ~ ":../data/crawld/java/" ~ noSlashRegex ~ "/" ~ noSlashRegex ~ "/" ~ pathRegex ^^ {
       case size ~ _ ~ owner ~ _ ~ repo ~ _ ~ path =>
-        CodeFileMetadata(size.replace("\n", "").toLong, "Java", CodeFileLocation(owner, repo, path))
+        CodeFileMetadata(size.replace("\n", "").toLong, Languages.Java, CodeFileLocation(owner, repo, path))
     }
     | number ~ ":../data/crawld/javascript/" ~ noSlashRegex ~ "/" ~ noSlashRegex ~ "/" ~ pathRegex ^^ {
       case size ~ _ ~ owner ~ _ ~ repo ~ _ ~ path =>
-        CodeFileMetadata(size.replace("\n", "").toLong, "JavaScript", CodeFileLocation(owner, repo, path))
+        CodeFileMetadata(size.replace("\n", "").toLong, Languages.JavaScript, CodeFileLocation(owner, repo, path))
     }
     | number ~ ":../data/crawld/scala/" ~ noSlashRegex ~ "/" ~ noSlashRegex ~ "/" ~ pathRegex ^^ {
       case size ~ _ ~ owner ~ _ ~ repo ~ _ ~ path =>
-        CodeFileMetadata(size.replace("\n", "").toLong, "Scala", CodeFileLocation(owner, repo, path))
+        CodeFileMetadata(size.replace("\n", "").toLong, Languages.Scala, CodeFileLocation(owner, repo, path))
     }
   )
 }
@@ -39,11 +41,13 @@ object AstExtractor {
 
   def extract(files: RDD[(Text, Text)]): RDD[CodeFileData] = {
     files.flatMap { case (headerLine, content) =>
-      val result = HeaderParser.parse(HeaderParser.parseBlob, headerLine.toString)
+      val result = HeaderParser.parse(HeaderParser.parseBlobHeader, headerLine.toString)
       if (result.isEmpty) None
       else Some(NoAstCodeFile(result.get, content))
     }.filter { case NoAstCodeFile(metadata, content) =>
-      metadata.size <= 10 * MEGABYTES
+      metadata.size <= 10 * MEGABYTES &&
+        Languages.extension(metadata.language) ==
+          FilenameUtils.getExtension(metadata.codeFileLocation.fileName)
     }.map { case NoAstCodeFile(metadata: CodeFileMetadata, content: Text) =>
       CodeFileData(metadata.size, metadata.language, metadata.codeFileLocation, content.toString)
     }.filter(codeFile =>
