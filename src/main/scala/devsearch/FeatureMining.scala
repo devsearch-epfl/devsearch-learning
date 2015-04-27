@@ -1,73 +1,61 @@
 package devsearch
 
+import devsearch.features.FeatureRecognizer
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.mapred.JobConf
-import org.apache.hadoop.io.{Text}
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat
+import org.apache.hadoop.io.Text
 
-
-/**
- * Created by hubi on 4/12/15.
- */
 object FeatureMining {
 
-  //TODO: SET PATH TO CORRECT REPOSITORY DIRECTORY HERE!
-  //val inputDir = "/projects/devsearch/repositories"
-  //val inputDir  = "/projects/devsearch/testrepos"
-  //val outputDir = "/projects/devsearch/features"
-  val inputDir =  "/home/hubi/Documents/BigData/DevSearch/testrepos"
-  val outputDir = "/home/hubi/Documents/BigData/DevSearch/features"
+  def mine(inputDir: String, outputDir: String, jobName: String) {
+    val conf = new SparkConf().setAppName(jobName)
+    implicit val sc = new SparkContext(conf)
+
+    // Go through each language directory and list all the contained blobs
+    val fs = FileSystem.get(new java.net.URI(inputDir + "/*"), new Configuration())
+    val blobPathList = fs.listStatus(new Path(inputDir))
+        // Language directories
+        .map(_.getPath)
+        // Files in the language directories
+        .flatMap(p => fs.listStatus(p))
+        .map(_.getPath.toString)
+
+    // Use custom input format to get header/snippet pairs from part files
+    val headerSnippetPairs = sc.union(
+      blobPathList.map(path =>
+        sc.newAPIHadoopFile(path, classOf[BlobInputFormat], classOf[Text], classOf[Text])
+      )
+    )
+
+    // Generate code files and remove those that don't have an AST
+    val codeFiles = AstExtractor.extract(headerSnippetPairs)
+
+    // Extract and store features
+    val features = codeFiles.flatMap(FeatureRecognizer)
+    features.map(_.encode).saveAsTextFile(outputDir)
+  }
 
   /**
    * We need to process the BLOBs file by file because the header line of each BLOBsnippet gets collected in AstExtractor.
    * Since the BLOBs are so huge this would cause problems if we extracted all BLOBs in parallel.
-   * @param args
    */
   def main(args: Array[String]) {
-    val conf = new SparkConf().setAppName("FeatureMining")
-    implicit val sc = new SparkContext(conf)
-
-
-    //Go through each language directory and list all the contained BLOBs
-    val fs = FileSystem.get(new java.net.URI(inputDir + "/*"), new Configuration())
-    val fileList = fs.listStatus(new Path(inputDir))
-                     .map(_.getPath)                    //these are all the language directories...
-                     .flatMap(p => fs.listStatus(p))    //these are all the files in the language directories
-                     .map(_.getPath.toString)
-
-
-    //process each BLOB
-    for(inputFile <- fileList){
-      println("\n\n\n\n\n\n\n\nProcessing "+ inputFile +"\n\n\n\n\n\n\n\n")
-
-      //TODO create newAPIHadoopRDD here!
-      //When I run the commented code below, I get this strange error: "[Fatal Error] :1:1: Content is not allowed in prolog."
-      //Usually this kind of error occurs if an xml file does not begin correctly (<?xml...)
-      // I guess, this is because the Configuration object is not initialized correctly...
-
-
-      val conf = new Configuration()
-      //conf.addResource(new Path(inputFile))
-      //conf.set("mapred.input.dir", inputFile)
-
-
-      val test = sc.newAPIHadoopFile(inputDir, classOf[BlobInputFormat], classOf[Text], classOf[Text])
-
-      println("\n\n\n\n\n\n\n\nGenerated "+test.count()+ " snippets.\n\n\n\n\n\n\n\n")
-
-/*
-
-      val codeFiles = AstExtractor extract inputFile
-
-      val features = CodeEater eat codeFiles
-
-      //println("\n\n\n\n\n\n\n\nGenerated "+features.count()+ " features from " + codeFiles.count + " files.\n\n\n\n\n\n\n\n")
-
-      features map(_.toString) saveAsTextFile(outputDir)
-*/
-
+    if (args.length != 3) {
+      println("Invalid arguments. Args are: input_dir output_dir job_name")
+      return
     }
+    // val javaInputDir = "hdfs:///projects/devsearch/pwalch/usable_repos/java"
+    // val javaOutputDir = "hdfs:///projects/devsearch/pwalch/features/java"
+    // val javaJobName = "devsearch_JavaFeatureMining"
+
+    val inputDir = args(0)
+    val outputDir = args(1)
+    val jobName = args(2);
+
+    val inputDirNoSlash = inputDir.replaceAll("/$", "")
+    mine(inputDirNoSlash, outputDir, jobName);
+
+    println("Mining done")
   }
 }
