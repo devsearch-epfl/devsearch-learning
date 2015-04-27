@@ -87,7 +87,7 @@ class BlobReader extends RecordReader[Text, Text] {
     if (!parsedHeader.isEmpty) {
       val metadata = parsedHeader.get
       val extensionMatchesLanguage = Languages.extension(metadata.language) ==
-          FilenameUtils.getExtension(metadata.codeFileLocation.fileName)
+          FilenameUtils.getExtension(metadata.location.fileName)
 
       if (metadata.size >= MAX_FILE_SIZE || !extensionMatchesLanguage) {
         needToParse = false

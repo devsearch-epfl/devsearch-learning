@@ -7,7 +7,7 @@ import org.apache.hadoop.io.Text
 import org.apache.spark.rdd._
 import scala.util.parsing.combinator._
 
-case class CodeFileMetadata(size: Long, language: String, codeFileLocation: CodeFileLocation) extends java.io.Serializable
+case class CodeFileMetadata(size: Long, language: String, location: CodeFileLocation) extends java.io.Serializable
 
 object HeaderParser extends RegexParsers with java.io.Serializable {
   val number: Parser[String] = """[\n]?\d+""".r
@@ -42,10 +42,10 @@ object AstExtractor {
       if (result.isEmpty) None
       else {
         val metadata = result.get
-        Some(CodeFileData(metadata.size, metadata.language, metadata.codeFileLocation, content.toString))
+        Some(CodeFileData(metadata.size, metadata.language, metadata.location, content.toString))
       }
     }.filter(codeFile =>
       codeFile.ast != NoDef
-        )
+    )
   }
 }
