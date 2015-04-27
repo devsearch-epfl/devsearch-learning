@@ -6,6 +6,8 @@ assemblySettings
 
 name := "devsearch-learning"
 
+shellPrompt := { state => "[\033[36m" + name.value + "\033[0m] $ " }
+
 version := "0.1"
 
 scalaVersion := "2.10.4"
