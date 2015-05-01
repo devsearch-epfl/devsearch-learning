@@ -1,13 +1,13 @@
 package devsearch
 
-import devsearch.ast.Empty.NoDef
+import devsearch.ast.{Empty, AST}
 import devsearch.features._
 import devsearch.parsers.Languages
 import org.apache.hadoop.io.Text
 import org.apache.spark.rdd._
 import scala.util.parsing.combinator._
 
-case class CodeFileMetadata(size: Long, language: String, location: CodeFileLocation) extends java.io.Serializable
+case class CodeFileMetadata(size: Long, majorLanguage: String, location: CodeFileLocation) extends java.io.Serializable
 
 object HeaderParser extends RegexParsers with java.io.Serializable {
   val numberRegex: Parser[String] = """[\n]?\d+""".r
@@ -38,13 +38,19 @@ object AstExtractor {
   def extract(files: RDD[(Text, Text)]): RDD[CodeFileData] = {
     files.flatMap { case (headerLine, content) =>
       val result = HeaderParser.parse(HeaderParser.parseBlobHeader, headerLine.toString)
-      if (result.isEmpty) None
-      else {
+      if (result.isEmpty) {
+        None
+      } else {
         val metadata = result.get
-        Some(CodeFileData(metadata.size, metadata.language, metadata.location, content.toString))
+
+        // Guess language (ignoring major language)
+        Languages.guess(metadata.location.fileName) match {
+          case Some(language) => Some(CodeFileData(metadata.size, language, metadata.location, content.toString))
+          case None => None
+        }
       }
     }.filter(codeFile =>
-      codeFile.ast != NoDef
+      codeFile.ast != Empty[AST]
     )
   }
 }
