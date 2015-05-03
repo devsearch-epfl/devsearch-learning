@@ -6,34 +6,15 @@ import org.apache.hadoop.mapreduce.lib.input.{FileSplit, FileInputFormat}
 import org.apache.hadoop.io.Text
 import org.apache.hadoop.mapreduce.{JobContext, TaskAttemptContext, InputSplit, RecordReader}
 import org.apache.commons.io.IOUtils
-import java.io.{BufferedReader, InputStreamReader}
+import java.io.{BufferedInputStream, BufferedReader, InputStreamReader}
+
+import org.kamranzafar.jtar.TarInputStream
 
 
 class BlobInputFormat extends FileInputFormat[Text, Text] {
-  override def createRecordReader(split: InputSplit, context: TaskAttemptContext): BlobReader =
-    new BlobReader
+  override def createRecordReader(split: InputSplit, context: TaskAttemptContext): BlobReader = new BlobReader
 
   override def isSplitable(context: JobContext, filename: Path): Boolean = false
-}
-
-object HeaderMatcher {
-  def isMatching(s: String): Boolean = {
-    val splittedLine = s.split(":")
-    if (splittedLine.length != 2) {
-      return false
-    }
-
-    val fileLength = splittedLine(0)
-    val headerRest = splittedLine(1)
-    val splittedRest = headerRest.split("/")
-
-    if (splittedRest.length <= 6) {
-      return false
-    }
-
-    return splittedRest(0) == ".." && splittedRest(1) == "data" && splittedRest(2) == "crawld" &&
-        fileLength.forall(_.isDigit)
-  }
 }
 
 /**
@@ -48,10 +29,10 @@ class BlobReader extends RecordReader[Text, Text] {
   var processed = false
   var lastLineRead = ""
 
-  var bufferedReader: BufferedReader = _
+  var tarInput: TarInputStream = _
 
   override def close(): Unit = {
-    IOUtils.closeQuietly(bufferedReader)
+    IOUtils.closeQuietly(tarInput)
   }
 
   override def initialize(split: InputSplit, context: TaskAttemptContext): Unit = {
@@ -59,53 +40,24 @@ class BlobReader extends RecordReader[Text, Text] {
     val path = firstSplit.getPath
     val fileSystem = path.getFileSystem(context.getConfiguration())
 
-    bufferedReader = new BufferedReader(new InputStreamReader(fileSystem.open(path)))
+    tarInput = new TarInputStream(new BufferedInputStream(fileSystem.open(path)));
   }
 
   /**
    * creates the next key-value pair
    */
   override def nextKeyValue(): Boolean = {
-    val header = lastLineRead match {
-      // If very first iteration
-      case "" => bufferedReader.readLine()
-      // If EOF has not been reached
-      case headerLine: String => headerLine
-      // If end of file
-      case _ => Nil
-    }
-
-    // If we don't have any header, then we reached the end of the blob
-    if (header == Nil) {
+    val entry = tarInput.getNextEntry
+    if (entry == null) {
       processed = true
-      return false
+    } else {
+      key.set(entry.getName)
+      val bytes = new Array[Byte](entry.getSize.toInt)
+      IOUtils.readFully(tarInput, bytes)
+      currentBlobSnippet.set(bytes)
     }
 
-    // We verify that we need to parse the following file
-    val parsedHeader = HeaderParser.parse(HeaderParser.parseBlobHeader, header.toString)
-    var needToParse = true
-    if (!parsedHeader.isEmpty) {
-      val metadata = parsedHeader.get
-
-      if (metadata.size >= MAX_FILE_SIZE || !Languages.isFileSupported(metadata.location.fileName)) {
-        needToParse = false
-      }
-    }
-
-    // If we have a header, we take the content of this snippet
-    var lineAcc = ""
-    Stream.continually {
-      lastLineRead = bufferedReader.readLine()
-      lastLineRead
-    }
-    // Take all the lines until the next header (excluded) or EOF
-    .takeWhile(l => l != null && !HeaderMatcher.isMatching(l))
-    .foreach(l => if(needToParse) lineAcc += l + "\n")
-
-    key.set(new Text(header.toString))
-    currentBlobSnippet.set(new Text(lineAcc))
-
-    true
+    !processed
   }
 
   override def getCurrentKey: Text = key
