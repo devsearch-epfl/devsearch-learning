@@ -5,7 +5,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.lib.input.{FileSplit, FileInputFormat}
 import org.apache.hadoop.io.Text
 import org.apache.hadoop.mapreduce.{JobContext, TaskAttemptContext, InputSplit, RecordReader}
-import org.apache.commons.io.{FilenameUtils, IOUtils}
+import org.apache.commons.io.IOUtils
 import java.io.{BufferedReader, InputStreamReader}
 
 
@@ -86,10 +86,8 @@ class BlobReader extends RecordReader[Text, Text] {
     var needToParse = true
     if (!parsedHeader.isEmpty) {
       val metadata = parsedHeader.get
-      val extensionMatchesLanguage = Languages.extension(metadata.language) ==
-          FilenameUtils.getExtension(metadata.location.fileName)
 
-      if (metadata.size >= MAX_FILE_SIZE || !extensionMatchesLanguage) {
+      if (metadata.size >= MAX_FILE_SIZE || !Languages.isFileSupported(metadata.location.fileName)) {
         needToParse = false
       }
     }
