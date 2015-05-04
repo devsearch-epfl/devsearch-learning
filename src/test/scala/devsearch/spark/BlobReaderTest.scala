@@ -8,7 +8,7 @@ class BlobReaderTest extends FlatSpec {
 
     assert(
       Set[String](
-        "java/typesafehub/config/project/Build.scala"
+        "java/typesafehub/config/SimpleLibContext.java"
       ).subsetOf(headerSet)
     )
   }

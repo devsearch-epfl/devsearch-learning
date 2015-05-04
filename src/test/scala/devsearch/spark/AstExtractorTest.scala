@@ -9,7 +9,7 @@ class AstExtractorTest extends FlatSpec {
 
     assert(
       Set[CodeFileLocation](
-        CodeFileLocation("typesafehub", "config", "project/Build.scala")
+        CodeFileLocation("typesafehub", "config", "SimpleLibContext.java")
       ).subsetOf(codeFileLocationSet)
     )
   }
