@@ -1,53 +1,32 @@
 package devsearch
 
-
-import java.nio.file.Files
-
+import java.io.File
 import org.apache.hadoop.io.Text
 import org.apache.spark.{SparkConf, SparkContext}
-import org.scalatest.{Matchers, FlatSpec}
+import org.scalatest.{FlatSpec}
 
-class BlobReaderTest extends FlatSpec with Matchers {
-  "The hadoop input format" should "retrieve the correct code fomr the blob" in {
-      val rootDir = Files.createTempDirectory("root")
-      val langDir = Files.createDirectory(rootDir.resolve("lang"))
-
-      val src = Files.createFile(langDir.resolve("src.scala"))
-
-      val content =
-        """
-          |object Main {
-          |
-          |   def main(args : Array[String]) : Unit = {
-          |     println("Hello world!")
-          |   }
-          |}
-        """.stripMargin
-
-      Files.write(src, content.getBytes("UTF-8"))
-
-      val outDir = Files.createTempDirectory("out")
-
-      devsearch.concat.Main.main(Array("-j", "1") ++ Array(rootDir, outDir).map(_.toAbsolutePath.toString))
-
-
-      val resFile = outDir.toFile.listFiles()(0).listFiles()(0)
-
-      val conf = new SparkConf().setMaster("local[1]").setAppName("BlobReaderTest")
-
-      val sc = new SparkContext(conf)
-
-
-      val rdd = sc.newAPIHadoopFile(resFile.getAbsolutePath, classOf[BlobInputFormat], classOf[Text], classOf[Text])
-
-      val arr = rdd.map{ case (key, value) => (key.toString, value.toString) }collect()
-
-
-      arr.size should equal(1)
-      val (key, value) = arr(0)
-
-      key should equal(rootDir.relativize(src).toString)
-      value should equal(content)
+class BlobReaderTest extends FlatSpec {
+  def recursiveListFiles(f: File): Array[File] = {
+    val these = f.listFiles
+    these ++ these.filter(_.isDirectory).flatMap(recursiveListFiles)
   }
 
+  def absResourcePath(path: String): String = {
+    val fileURL = getClass.getResource(path)
+    new java.io.File(fileURL.toURI).getAbsolutePath
+  }
+
+  "The hadoop input format" should "retrieve the correct code from the blob" in {
+    val conf = new SparkConf().setMaster("local[2]").setAppName("BlobReaderTest")
+    val sc = new SparkContext(conf)
+
+    val filenameList = recursiveListFiles(new File(absResourcePath("/concat"))).map(file => file.getAbsolutePath)
+    val headerSnippetPairs = sc.union(
+      filenameList.map(path =>
+        sc.newAPIHadoopFile(path, classOf[BlobInputFormat], classOf[Text], classOf[Text])
+      )
+    )
+    val keyValueList = headerSnippetPairs.map { case (key, value) => (key.toString, value.toString) }.collect().toList
+    // TODO(pwalch) Assert that the list contains some keys for the archive provided by Damien
+  }
 }
