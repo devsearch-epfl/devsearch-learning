@@ -1,18 +1,18 @@
 package devsearch.spark
 
-import devsearch.features.FeatureRecognizer
+import devsearch.features.{Feature, FeatureRecognizer}
+import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.io.Text
 
 object FeatureMining {
-
   def mine(inputDir: String, outputDir: String, jobName: String) {
     val conf = new SparkConf().setAppName(jobName)
-    implicit val sc = new SparkContext(conf)
+    val sc = new SparkContext(conf)
 
-    // Go through each language directory and list all the contained blobs
+    // Recursively list files
     val fs = FileSystem.get(new java.net.URI(inputDir + "/*"), new Configuration())
     val blobPathList = fs.listStatus(new Path(inputDir))
         // Language directories
@@ -20,20 +20,27 @@ object FeatureMining {
         // Files in the language directories
         .flatMap(p => fs.listStatus(p))
         .map(_.getPath.toString)
+        .toList
 
-    // Use custom input format to get header/snippet pairs from part files
-    val headerSnippetPairs = sc.union(
-      blobPathList.map(path =>
+    val headerSnippetPairs = readInput(sc, blobPathList)
+    val features = extractFeatures(headerSnippetPairs)
+    features.map(_.encode).saveAsTextFile(outputDir)
+  }
+
+  def readInput(sc: SparkContext, files: List[String]): RDD[(Text, Text)] = {
+    sc.union(
+      files.map(path =>
         sc.newAPIHadoopFile(path, classOf[BlobInputFormat], classOf[Text], classOf[Text])
       )
     )
+  }
 
+  def extractFeatures(headerSnippetPairs: RDD[(Text, Text)]): RDD[Feature] = {
     // Generate code files and remove those that don't have an AST
     val codeFiles = AstExtractor.extract(headerSnippetPairs)
 
-    // Extract and store features
-    val features = codeFiles.flatMap(FeatureRecognizer)
-    features.map(_.encode).saveAsTextFile(outputDir)
+    // Extract features from ASTs return them
+    codeFiles.flatMap(FeatureRecognizer)
   }
 
   /**

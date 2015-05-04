@@ -11,11 +11,7 @@ object Utility {
   val sc = new SparkContext(conf)
 
   val filenameList = Utility.listConcatFiles()
-  val headerSnippetPairs = sc.union(
-    filenameList.map(path =>
-      sc.newAPIHadoopFile(path, classOf[BlobInputFormat], classOf[Text], classOf[Text])
-    )
-  )
+  val headerSnippetPairs = FeatureMining.readInput(sc, filenameList)
 
   private def listConcatFiles(): List[String] = {
     recursiveListFiles(new File(absResourcePath("/concat"))).map(file => file.getAbsolutePath).toList
