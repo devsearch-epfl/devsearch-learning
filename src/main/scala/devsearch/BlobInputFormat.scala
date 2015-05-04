@@ -6,28 +6,23 @@ import org.apache.hadoop.mapreduce.lib.input.{FileSplit, FileInputFormat}
 import org.apache.hadoop.io.Text
 import org.apache.hadoop.mapreduce.{JobContext, TaskAttemptContext, InputSplit, RecordReader}
 import org.apache.commons.io.IOUtils
-import java.io.{BufferedInputStream, BufferedReader, InputStreamReader}
+import java.io.BufferedInputStream
 
 import org.kamranzafar.jtar.TarInputStream
 
-
+/**
+ * This input format only works if files inside tarballs can be kept in memory
+ */
 class BlobInputFormat extends FileInputFormat[Text, Text] {
   override def createRecordReader(split: InputSplit, context: TaskAttemptContext): BlobReader = new BlobReader
 
   override def isSplitable(context: JobContext, filename: Path): Boolean = false
 }
 
-/**
- * The BlobReader goes through a BLOB line by line and returns all contained BLOBsnippets.
- */
 class BlobReader extends RecordReader[Text, Text] {
-  val MEGABYTES = Math.pow(2, 20)
-  val MAX_FILE_SIZE = 2 * MEGABYTES
-
   var key = new Text("")
   var currentBlobSnippet = new Text("")
   var processed = false
-  var lastLineRead = ""
 
   var tarInput: TarInputStream = _
 
@@ -43,21 +38,22 @@ class BlobReader extends RecordReader[Text, Text] {
     tarInput = new TarInputStream(new BufferedInputStream(fileSystem.open(path)));
   }
 
-  /**
-   * creates the next key-value pair
-   */
   override def nextKeyValue(): Boolean = {
     val entry = tarInput.getNextEntry
     if (entry == null) {
       processed = true
     } else {
-      key.set(entry.getName)
-      val bytes = new Array[Byte](entry.getSize.toInt)
-      IOUtils.readFully(tarInput, bytes)
-      currentBlobSnippet.set(bytes)
+      val fileName = entry.getName
+      if (Languages.isFileSupported(fileName)) {
+        key.set(fileName)
+        val bytes = new Array[Byte](entry.getSize.toInt)
+        IOUtils.readFully(tarInput, bytes)
+        currentBlobSnippet.set(bytes)
+      }
     }
 
-    !processed
+    val hasPairBeenFound = !processed
+    hasPairBeenFound
   }
 
   override def getCurrentKey: Text = key
