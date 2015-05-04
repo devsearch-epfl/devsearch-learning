@@ -1,4 +1,4 @@
-package devsearch
+package devsearch.spark
 
 import devsearch.features.FeatureRecognizer
 import org.apache.spark.{SparkConf, SparkContext}

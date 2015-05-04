@@ -1,4 +1,4 @@
-package devsearch
+package devsearch.spark
 
 import devsearch.parsers.Languages
 import org.apache.hadoop.fs.Path

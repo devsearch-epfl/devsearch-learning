@@ -1,4 +1,4 @@
-package devsearch
+package devsearch.spark
 
 import devsearch.ast.{Empty, AST}
 import devsearch.features._
