@@ -8,6 +8,7 @@ import org.apache.spark.rdd._
 import scala.util.parsing.combinator._
 
 case class CodeFileMetadata(majorLanguage: String, location: CodeFileLocation) extends java.io.Serializable
+
 object HeaderParser extends RegexParsers with java.io.Serializable {
   val noSlashRegex: Parser[String] = """[^/]+""".r
   val pathRegex: Parser[String] = """[^\n]+""".r
@@ -21,7 +22,7 @@ object HeaderParser extends RegexParsers with java.io.Serializable {
 }
 
 object AstExtractor {
-  def extract(files: RDD[(Text, Text)]): RDD[CodeFileData] = {
+  def extract(files: RDD[(Text, Text)]): RDD[CodeFile] = {
     files.flatMap { case (headerLine, content) =>
       val result = HeaderParser.parse(HeaderParser.parseBlobHeader, headerLine.toString)
       if (result.isEmpty) {
@@ -31,7 +32,7 @@ object AstExtractor {
 
         // Guess language (ignoring major language)
         Languages.guess(metadata.location.fileName) match {
-          case Some(language) => Some(CodeFileData(language, metadata.location, content.toString))
+          case Some(language) => Some(CodeFile(language, metadata.location, content.toString))
           case None => None
         }
       }
