@@ -37,7 +37,8 @@ object FeatureMining {
   }
 
   /**
-   * We need to process the BLOBs file by file because the header line of each BLOBsnippet gets collected in AstExtractor.
+   * We need to process the BLOBs file by file because the header line of each BLOBsnippet
+   * gets collected in AstExtractor.
    * Since the BLOBs are so huge this would cause problems if we extracted all BLOBs in parallel.
    */
   def main(args: Array[String]) {

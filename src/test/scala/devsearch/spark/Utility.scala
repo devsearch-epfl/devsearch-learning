@@ -7,19 +7,15 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
 object Utility {
-  def retrieveSparkRdd(): RDD[(Text, Text)] = {
-    val conf = new SparkConf().setMaster("local[2]").setAppName("BlobReaderTest")
-    val sc = new SparkContext(conf)
+  val conf = new SparkConf().setMaster("local[2]").setAppName("BlobReaderTest")
+  val sc = new SparkContext(conf)
 
-    val filenameList = Utility.listConcatFiles()
-    val headerSnippetPairs = sc.union(
-      filenameList.map(path =>
-        sc.newAPIHadoopFile(path, classOf[BlobInputFormat], classOf[Text], classOf[Text])
-      )
+  val filenameList = Utility.listConcatFiles()
+  val headerSnippetPairs = sc.union(
+    filenameList.map(path =>
+      sc.newAPIHadoopFile(path, classOf[BlobInputFormat], classOf[Text], classOf[Text])
     )
-
-    headerSnippetPairs
-  }
+  )
 
   private def listConcatFiles(): List[String] = {
     recursiveListFiles(new File(absResourcePath("/concat"))).map(file => file.getAbsolutePath).toList

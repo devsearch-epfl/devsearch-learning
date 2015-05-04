@@ -5,8 +5,12 @@ import org.scalatest.FlatSpec
 
 class AstExtractorTest extends FlatSpec {
   "AST extractor" should "extract some correct metadata" in {
-    val codeFileLocationSet = AstExtractor.extract(Utility.retrieveSparkRdd()).map(_.location).collect.toSet
+    val codeFileLocationSet = AstExtractor.extract(Utility.headerSnippetPairs).map(_.location).collect.toSet
 
-    assert(Set[CodeFileLocation](CodeFileLocation("java", "typesafehub", "project/Build.scala")).subsetOf(codeFileLocationSet))
+    assert(
+      Set[CodeFileLocation](
+        CodeFileLocation("typesafehub", "config", "project/Build.scala")
+      ).subsetOf(codeFileLocationSet)
+    )
   }
 }

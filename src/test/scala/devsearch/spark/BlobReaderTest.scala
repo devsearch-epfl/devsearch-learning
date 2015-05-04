@@ -4,9 +4,12 @@ import org.scalatest.FlatSpec
 
 class BlobReaderTest extends FlatSpec {
   "The hadoop input format" should "retrieve the correct code from the blob" in {
-    val headerSnippetPairs = Utility.retrieveSparkRdd()
-    val keyValueList = headerSnippetPairs.map { case (key, value) => (key.toString, value.toString) }.collect().toList
-    //println(keyValueList.map(_._1).mkString("\n"))
-    // TODO(pwalch) Assert that the list contains some keys for the archive provided by Damien
+    val headerSet = Utility.headerSnippetPairs.map(_._1.toString).collect().toSet
+
+    assert(
+      Set[String](
+        "java/typesafehub/config/project/Build.scala"
+      ).subsetOf(headerSet)
+    )
   }
 }
