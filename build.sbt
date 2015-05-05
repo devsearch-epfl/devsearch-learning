@@ -22,8 +22,7 @@ resolvers ++= Seq(
 libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.1.7" % "test",
   "org.apache.spark" %% "spark-core" % "1.3.0" % "provided",
-  "org.apache.commons" % "commons-compress" % "1.9",
-  "ch.qos.logback" % "logback-classic" % "0.9.24"
+  "org.apache.commons" % "commons-compress" % "1.9"
 )
 
 parallelExecution in Test := false

@@ -1,9 +1,6 @@
 package devsearch.spark
 
 import java.io.File
-
-import org.apache.hadoop.io.Text
-import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
 object Utility {
