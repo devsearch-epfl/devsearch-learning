@@ -1,6 +1,6 @@
 package devsearch.spark
 
-import devsearch.ast.{Empty, AST}
+import devsearch.ast.{ContentsSource, Empty, AST}
 import devsearch.features._
 import devsearch.parsers.Languages
 import org.apache.hadoop.io.Text
@@ -32,7 +32,12 @@ object AstExtractor {
 
         // Guess language (ignoring major language)
         Languages.guess(metadata.location.fileName) match {
-          case Some(language) => Some(CodeFile(language, metadata.location, content.toString))
+          case Some(language) =>
+            val uniqueOutputLocation = metadata.location.toString
+            Some(CodeFile(
+              language, metadata.location,
+              new ContentsSource(uniqueOutputLocation, content.toString)
+            ))
           case None => None
         }
       }
