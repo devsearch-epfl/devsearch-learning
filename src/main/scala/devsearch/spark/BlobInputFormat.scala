@@ -1,6 +1,8 @@
 package devsearch.spark
 
 import devsearch.parsers.Languages
+import org.apache.commons.compress.archivers.{ArchiveStreamFactory, ArchiveInputStream}
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.lib.input.{FileSplit, FileInputFormat}
 import org.apache.hadoop.io.Text
@@ -8,7 +10,6 @@ import org.apache.hadoop.mapreduce.{JobContext, TaskAttemptContext, InputSplit, 
 import org.apache.commons.io.IOUtils
 import java.io.BufferedInputStream
 
-import org.kamranzafar.jtar.TarInputStream
 
 /**
  * This input format only works if files inside tarballs can be kept in memory
@@ -24,7 +25,7 @@ class BlobReader extends RecordReader[Text, Text] {
   var currentBlobSnippet = new Text("")
   var processed = false
 
-  var tarInput: TarInputStream = _
+  var tarInput: ArchiveInputStream = _
 
   override def close(): Unit = {
     IOUtils.closeQuietly(tarInput)
@@ -35,7 +36,7 @@ class BlobReader extends RecordReader[Text, Text] {
     val path = firstSplit.getPath
     val fileSystem = path.getFileSystem(context.getConfiguration())
 
-    tarInput = new TarInputStream(new BufferedInputStream(fileSystem.open(path)));
+    tarInput = new ArchiveStreamFactory().createArchiveInputStream(ArchiveStreamFactory.TAR, new BufferedInputStream(fileSystem.open(path)));
   }
 
   override def nextKeyValue(): Boolean = {
