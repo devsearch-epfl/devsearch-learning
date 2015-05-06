@@ -21,8 +21,9 @@ resolvers ++= Seq(
 
 libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.1.7" % "test",
-  "org.apache.spark" %% "spark-core" % "1.3.0" % "provided",
-  "org.apache.commons" % "commons-compress" % "1.9"
+  "org.apache.spark" %% "spark-core" % "1.3.1" % "provided",
+  "org.apache.commons" % "commons-compress" % "1.9",
+  "io.spray" %%  "spray-json" % "1.3.1"
 )
 
 parallelExecution in Test := false
