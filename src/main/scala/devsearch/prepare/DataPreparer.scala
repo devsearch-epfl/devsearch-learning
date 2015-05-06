@@ -21,6 +21,8 @@ object RepoRankJsonProtocol extends DefaultJsonProtocol {
   implicit val jsonRepoRankFormat = jsonFormat2(JsonRepoRank)
 }
 
+//spark-submit --num-executors 35 --class "devsearch.prepare.DataPreparer" --master yarn-client "devsearch-learning-assembly-0.1.jar" "/projects/devsearch/pwalch/features/*/*" "/projects/devsearch/ranking/*" "/projects/devsearch/JsonBuckets" 5
+
 
 /**
  * Created by hubi on 5/1/15.
@@ -78,30 +80,30 @@ object DataPreparer {
 
     //transform into JSON and assign each line to a bucket.
     //The bucket is chosen according to ownerRepo.
-    val featuresJSON = features.map(Feature.parse(_)).map(f => {
+    val featuresJSON = features.map(Feature.parse(_)).collect{ case f if f.key.length < 512 => {
       import FeatureJsonProtocol._
       import LineJsonProtocol._
-      val owner = f.pos.location.user
-      val repo  = f.pos.location.repoName
-      val file  = f.pos.location.fileName
+      val feature = f.key
+      val owner   = f.pos.location.user
+      val repo    = f.pos.location.repoName
+      val file    = f.pos.location.fileName
       val jsonFeature = JsonFeature(
-        f.key,
+        feature,
         owner + "/" + repo + "/" + file,
         JsonLine(f.pos.line.toString).toJson.asJsObject
       ).toJson.asJsObject.toString
-      ring.get(owner + "/" + repo) match {
-        case Some(bucket: String) => (bucket, jsonFeature)
-      }
-    })
 
-    val ranksJSON = ranks.map{
-      r =>
+      (ring.get(owner + "/" + repo).get, jsonFeature)
+    }}
+
+    val ranksJSON = ranks.collect{
+      case r if r.takeWhile(_ != ',').length < 512 => {
         val splitted = r.split(",")
         import RepoRankJsonProtocol._
         val jsonRepoRank = JsonRepoRank(splitted(0), splitted(1).toDouble).toJson.asJsObject.toString
-        ring.get(splitted(0)) match {
-          case Some(bucket: String) => (bucket, jsonRepoRank)
-        }
+
+        (ring.get(splitted(0)).get, jsonRepoRank)
+      }
     }
 
 
