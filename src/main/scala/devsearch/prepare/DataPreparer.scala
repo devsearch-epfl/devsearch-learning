@@ -12,9 +12,9 @@ case class JsonLine(line: String)
 object LineJsonProtocol extends DefaultJsonProtocol {
   implicit val jsonNumberFormat = jsonFormat(JsonLine, "$numberInt")
 }
-case class JsonFeature(key: String, ownerRepo: String, fileName: String, line: JsObject)
+case class JsonFeature(feature: String, file: String, line: JsObject)
 object FeatureJsonProtocol extends DefaultJsonProtocol {
-  implicit val jsonFeatureFormat = jsonFormat4(JsonFeature)
+  implicit val jsonFeatureFormat = jsonFormat3(JsonFeature)
 }
 case class JsonRepoRank(ownerRepo: String, score: Double)
 object RepoRankJsonProtocol extends DefaultJsonProtocol {
@@ -81,12 +81,15 @@ object DataPreparer {
     val featuresJSON = features.map(Feature.parse(_)).map(f => {
       import FeatureJsonProtocol._
       import LineJsonProtocol._
-      val ownerRepo = f.pos.location.user+"/"+f.pos.location.repoName
-      val jsonFeature = JsonFeature(f.key,
-        ownerRepo,
-        f.pos.location.fileName,
-        JsonLine(f.pos.line.toString).toJson.asJsObject).toJson.asJsObject.toString
-      ring.get(ownerRepo) match {
+      val owner = f.pos.location.user
+      val repo  = f.pos.location.repoName
+      val file  = f.pos.location.fileName
+      val jsonFeature = JsonFeature(
+        f.key,
+        owner + "/" + repo + "/" + file,
+        JsonLine(f.pos.line.toString).toJson.asJsObject
+      ).toJson.asJsObject.toString
+      ring.get(owner + "/" + repo) match {
         case Some(bucket: String) => (bucket, jsonFeature)
       }
     })
