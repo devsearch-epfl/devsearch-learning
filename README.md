@@ -10,7 +10,7 @@ The FeatureMining class extracts features from tarballs using a Spark job.
 	* Rename the generated file to `learning.jar` 
 
 * Run Spark feature extractor
-    * `spark-submit --num-executors 25 --class devsearch.spark.FeatureMining --master yarn-client learning.jar "hdfs:///projects/devsearch/pwalch/tarballs" "hdfs:///projects/devsearch/pwalch/features/tarballs" "Devsearch_tarballs" > spark_all_log.txt 2>&1`
+    * `spark-submit --num-executors 25 --class devsearch.spark.FeatureMining --master yarn-client learning.jar "hdfs:///projects/devsearch/pwalch/tarballs" "hdfs:///projects/devsearch/pwalch/features/tarballs" "Devsearch_tarballs" > spark_tarballs.txt 2>&1`
 
 # Script usage to generate miniblobs (old format)
 
