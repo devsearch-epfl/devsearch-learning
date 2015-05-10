@@ -9,7 +9,7 @@ import org.apache.hadoop.io.Text
 
 object FeatureMining {
   def mine(inputDir: String, outputDir: String, jobName: String) {
-    val conf = new SparkConf().setAppName(jobName)
+    val conf = new SparkConf().setAppName(jobName).set("spark.executor.memory", "2g")
     val sc = new SparkContext(conf)
 
     // Recursively list files
