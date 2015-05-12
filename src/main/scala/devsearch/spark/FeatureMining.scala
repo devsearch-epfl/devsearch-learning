@@ -59,10 +59,10 @@ object FeatureMining {
 
     val inputDir = args(0)
     val outputDir = args(1)
-    val jobName = args(2);
+    val jobName = args(2)
 
     val inputDirNoSlash = inputDir.replaceAll("/$", "")
-    mine(inputDirNoSlash, outputDir, jobName);
+    mine(inputDirNoSlash, outputDir, jobName)
 
     println("Mining done")
   }
