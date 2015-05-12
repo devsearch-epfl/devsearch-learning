@@ -1,6 +1,11 @@
 language: scala
 script:
-    - sbt clean update compile test
+- sbt clean update compile test doc
+after_script:
+- ./update_scaladoc.sh
 jdk:
-    - oraclejdk8
-    - openjdk7
+- oraclejdk8
+- openjdk7
+env:
+  global:
+    secure: CJt3hplFcPr/Hi5zqCO7+3+frWHdU+lZDmVJKedjws0TikjUzgTnKw5RJsoabd9fgfbeFhC9R3xeXAIGb5prKr9Ch5o2Wz4D/dHX3sMpHA2+3ShEwp4VmMDPd0w9Su3TvVWvw+yZQxvlV+n3qB8n7jrakXehBG25r2D1sob2o2s=
