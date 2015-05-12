@@ -55,7 +55,7 @@ while (my $line = <$inputFile>) {
         my $nextBlobSize = $1;        
         
         # If the current blob is full
-	my $isInitializing = ($blobIndex == 0 && $bytesCount == 0);
+        my $isInitializing = ($blobIndex == 0 && $bytesCount == 0);
         if ((($bytesCount + $nextBlobSize) >= $blobSize)
              or $isInitializing) {
             if (!$isInitializing) {
