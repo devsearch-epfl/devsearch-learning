@@ -1,16 +1,17 @@
 package devsearch.prepare
 
-import org.apache.spark.{rdd, SparkConf, SparkContext}
+
 import devsearch.features.Feature
 import spray.json._
 import spray.json.DefaultJsonProtocol
+import org.apache.spark.{SparkConf, SparkContext}
 
 /**
  * These three classes are needed for transforming RepoRanks and Features into JSON format. (THX Pwalch!)
  */
-case class JsonLine(line: String)
-object LineJsonProtocol extends DefaultJsonProtocol {
-  implicit val jsonNumberFormat = jsonFormat(JsonLine, "$numberInt")
+case class JsonNumberInt(line: String)
+object NumberIntJsonProtocol extends DefaultJsonProtocol {
+  implicit val jsonNumberFormat = jsonFormat(JsonNumberInt, "$numberInt")
 }
 case class JsonFeature(feature: String, file: String, line: JsObject)
 object FeatureJsonProtocol extends DefaultJsonProtocol {
@@ -20,8 +21,11 @@ case class JsonRepoRank(ownerRepo: String, score: Double)
 object RepoRankJsonProtocol extends DefaultJsonProtocol {
   implicit val jsonRepoRankFormat = jsonFormat2(JsonRepoRank)
 }
+case class JsonCount(feature: String, language: String, count: JsObject)
+object CountJsonProtocol extends DefaultJsonProtocol {
+  implicit val jsonCountFormate = jsonFormat3(JsonCount)
+}
 
-//spark-submit --num-executors 35 --class "devsearch.prepare.DataPreparer" --master yarn-client "devsearch-learning-assembly-0.1.jar" "/projects/devsearch/pwalch/features/*/*" "/projects/devsearch/ranking/*" "/projects/devsearch/JsonBuckets" 5
 
 
 /**
@@ -45,6 +49,9 @@ object RepoRankJsonProtocol extends DefaultJsonProtocol {
  * - 3rd argument is the output directory of the buckets
  * - 4th argument is the number of buckets
  */
+ // Example:
+ // spark-submit --num-executors 100 --class "devsearch.prepare.DataPreparer" --master yarn-client "devsearch-learning-assembly-0.1.jar" "/projects/devsearch/pwalch/features/*/*" "/projects/devsearch/ranking/*" "/projects/devsearch/JsonBuckets" 5
+
 object DataPreparer {
 
 
@@ -63,7 +70,7 @@ object DataPreparer {
 
 
 
-    val sparkConf = new SparkConf().setAppName("Data Splitter").setMaster("local[4]")
+    val sparkConf = new SparkConf().setAppName("Data Splitter")
     val sc = new SparkContext(sparkConf)
 
 
@@ -80,23 +87,32 @@ object DataPreparer {
 
     //transform into JSON and assign each line to a bucket.
     //The bucket is chosen according to ownerRepo.
-    val featuresJSON = features.map(Feature.parse(_)).collect{ case f if f.key.length < 512 => {
-      import FeatureJsonProtocol._
-      import LineJsonProtocol._
-      val feature = f.key
-      val owner   = f.pos.location.user
-      val repo    = f.pos.location.repoName
-      val file    = f.pos.location.fileName
+    val featuresJSON= features.map(Feature.parse(_)).collect{ case f if f.key.length < 512 => {
+      import NumberIntJsonProtocol._
+      val feature  = f.key
+      val owner    = f.pos.location.user
+      val repo     = f.pos.location.repoName
+      val file     = f.pos.location.fileName
+      val bucket   = ring.get(owner + "/" + repo).get
       val jsonFeature = JsonFeature(
         feature,
         owner + "/" + repo + "/" + file,
-        JsonLine(f.pos.line.toString).toJson.asJsObject
-      ).toJson.asJsObject.toString
+        JsonNumberInt(f.pos.line.toString).toJson.asJsObject
+      )
 
-      (ring.get(owner + "/" + repo).get, jsonFeature)
+      (bucket, jsonFeature)
     }}
 
-    val ranksJSON = ranks.collect{
+    //transform features into JSON
+    val featuresJsonString = featuresJSON.map{
+      import FeatureJsonProtocol._
+      f => (f._1, f._2.toJson.asJsObject.toString)
+    }
+
+
+
+    //transform repoRank into JSON
+    val ranksJsonString = ranks.collect{
       case r if r.takeWhile(_ != ',').length < 512 => {
         val splitted = r.split(",")
         import RepoRankJsonProtocol._
@@ -107,11 +123,56 @@ object DataPreparer {
     }
 
 
+
+    //count the nb occurrences of each feature per language and bucket and create a JSON string:
+    //first transform it into key-value pair, then sum up.
+    val partitionCount = featuresJSON.map{
+      case (bucket, JsonFeature(feature, ownerRepoFile, line)) => {
+        val language = ownerRepoFile.substring(ownerRepoFile.lastIndexOf('.') + 1)
+        ((bucket, feature, language), 1)
+      }
+    }.reduceByKey(_+_)
+
+    
+
+    //sum up partitionCounts for getting the global count:
+    val globalCountJsonString = partitionCount.groupBy{
+      case ((bucket, feature, language), count) => (feature, language)
+    }.map{
+      case ((feature, language), partitionCounts) => {
+        import CountJsonProtocol._
+        import NumberIntJsonProtocol._
+        val totCount = partitionCounts.foldLeft(0){case (acc, ((bucket, feature, language), count: Int)) => acc + count}
+        JsonCount(feature, language, JsonNumberInt(totCount.toString).toJson.asJsObject).toJson.asJsObject.toString
+      }
+    }
+
+    //transform partitionCount into JSON
+    val partitionCountJsonString = partitionCount.map{
+      case ((bucket, feature, language), count) =>
+        import NumberIntJsonProtocol._
+        import CountJsonProtocol._
+        (bucket, JsonCount(feature, language, JsonNumberInt(count.toString).toJson.asJsObject).toJson.asJsObject.toString)
+    }
+
+
+
     //Since bucket 0 is always empty, only go from 1 to nbBuckets
     for (i <- 1 to nbBuckets) {
-      featuresJSON.filter(_._1 == "bucket" + i).map(_._2).saveAsTextFile(outputPath + "/features/bucket" + i)
-      ranksJSON.filter(_._1 == "bucket" + i).map(_._2).saveAsTextFile(outputPath + "/repoRank/bucket" + i)
+      featuresJsonString.filter(_._1 == "bucket" + i).map(_._2).saveAsTextFile(outputPath + "/features/bucket" + i)
     }
+
+    for (i <- 1 to nbBuckets) {
+      ranksJsonString.filter(_._1 == "bucket" + i).map(_._2).saveAsTextFile(outputPath + "/repoRank/bucket" + i)
+    }
+
+    globalCountJsonString.saveAsTextFile(outputPath + "/globalCount")
+
+    for (i <- 1 to nbBuckets) {
+      partitionCountJsonString.filter(_._1 == "bucket" + i).map(_._2).saveAsTextFile(outputPath + "/partitionCounts/bucket" + i)
+    }
+
+
   }
 }
 
