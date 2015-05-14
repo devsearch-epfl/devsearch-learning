@@ -25,21 +25,19 @@ object AstExtractor {
   def extract(files: RDD[(Text, Text)]): RDD[CodeFile] = {
     files.flatMap { case (headerLine, content) =>
       val result = HeaderParser.parse(HeaderParser.parseBlobHeader, headerLine.toString)
-      if (result.isEmpty) {
-        None
-      } else {
-        val metadata = result.get
-
-        // Guess language (ignoring major language)
-        Languages.guess(metadata.location.fileName) match {
-          case Some(language) =>
-            val uniqueOutputLocation = metadata.location.toString
-            Some(CodeFile(
-              language, metadata.location,
-              new ContentsSource(uniqueOutputLocation, content.toString)
-            ))
-          case None => None
-        }
+      result match {
+        case HeaderParser.Success(metadata, n) =>
+          // Guess language (ignoring major language)
+          Languages.guess(metadata.location.fileName) match {
+            case Some(language) =>
+              val uniqueOutputLocation = metadata.location.toString
+              Some(CodeFile(
+                language, metadata.location,
+                new ContentsSource(uniqueOutputLocation, content.toString)
+              ))
+            case None => None
+          }
+        case _ => None
       }
     }.filter(codeFile =>
       codeFile.ast != Empty[AST]

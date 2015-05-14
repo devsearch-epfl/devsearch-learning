@@ -1,12 +1,20 @@
 devsearch-learning
 =======================================
 
+The FeatureMining class extracts features from tarballs using a Spark job.
+
+# Extract features from tarballs
+
+* Generate and upload JAR file
+	* `sbt assembly`
+	* Rename the generated file to `learning.jar` 
+
+* Run Spark feature extractor
+    * `spark-submit --num-executors 25 --class devsearch.spark.FeatureMining --master yarn-client learning.jar "hdfs:///projects/devsearch/pwalch/tarballs" "hdfs:///projects/devsearch/pwalch/features/tarballs" "Devsearch_tarballs" > spark_tarballs.txt 2>&1`
+
+# Script usage to generate miniblobs (old format)
+
 The `splitter.pl` script splits the megablobs (650MB) from `devsearch-concat` into miniblobs (120MB) such that no file is shared by two parts.
-
-The FeatureMining class extracts features from miniblobs. It processes them individually, extracts CodeFiles and parses them. From the received ASTs it extracts features and saves them as a text file. FeatureMining basically calls all the methods provided in devsearch-ast.
-
-
-# Script usage
 
 ## Split DevMine data (megablobs) into smaller blobs (miniblobs)
 
@@ -29,13 +37,3 @@ The FeatureMining class extracts features from miniblobs. It processes them indi
 * Put files back on HDFS
     * `hadoop fs -mkdir /projects/devsearch/pwalch/usable_repos/java`
     * `hadoop fs -put miniblobs/part-* /projects/devsearch/pwalch/usable_repos/java`
-
-## Extract features from miniblobs
-
-* Generate and upload JAR file
-	* `sbt assembly`
-	* Rename the generated file to `learning.jar` 
-
-* Run Spark feature extractor
-    * `spark-submit --num-executors 25 --class devsearch.FeatureMining --master yarn-client learning.jar "hdfs:///projects/devsearch/pwalch/usable_repos/java" "hdfs:///projects/devsearch/pwalch/features/java" devsearch_JavaCodeMining > spark_all_log.txt 2>&1`
-

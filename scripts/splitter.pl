@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
-# DevSearch
+# Splits big code files separated by headers written in this format:
+# 1531:../data/crawld/java/devsearch/learning/built.sbt
 
 use utf8;
 
@@ -54,7 +55,7 @@ while (my $line = <$inputFile>) {
         my $nextBlobSize = $1;        
         
         # If the current blob is full
-	my $isInitializing = ($blobIndex == 0 && $bytesCount == 0);
+        my $isInitializing = ($blobIndex == 0 && $bytesCount == 0);
         if ((($bytesCount + $nextBlobSize) >= $blobSize)
              or $isInitializing) {
             if (!$isInitializing) {

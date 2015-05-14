@@ -2,7 +2,7 @@ import AssemblyKeys._  // put this at the top of the file
 
 assemblySettings
 
-
+target in Compile in doc := baseDirectory.value / "api"
 
 name := "devsearch-learning"
 
