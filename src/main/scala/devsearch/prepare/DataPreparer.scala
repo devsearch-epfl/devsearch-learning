@@ -49,9 +49,10 @@ object CountJsonProtocol extends DefaultJsonProtocol {
  * - 3rd argument is the output directory of the buckets
  * - 4th argument is the minimum number of counts. Features with a lower count are not being saved in the featureCount.
  * - 5th argument is the number of buckets
+ * - 6th argument tells if stats shall be created or not. ('Y' = define stats)
  */
  // Example:
- // spark-submit --num-executors 100 --class "devsearch.prepare.DataPreparer" --master yarn-client "devsearch-learning-assembly-0.1.jar" "/projects/devsearch/pwalch/features/*/*" "/projects/devsearch/ranking/*" "/projects/devsearch/JsonBuckets" 5
+ // spark-submit --num-executors 200 --class "devsearch.prepare.DataPreparer" --master yarn-client "devsearch-learning-assembly-0.1.jar" "/projects/devsearch/pwalch/features/*/*" "/projects/devsearch/ranking/*" "/projects/devsearch/testJsonBuckets" 3 5 y
 
 object DataPreparer {
 
@@ -59,8 +60,8 @@ object DataPreparer {
   def main(args: Array[String]) {
 
     //some argument checking...
-    if(args.length != 5)
-      throw new ArgumentException("You need to enter 5 arguemnts, not " + args.length + ". ")
+    if(args.length != 6)
+      throw new ArgumentException("You need to enter 6 arguemnts, not " + args.length + ". ")
     if(!args(3).matches("""\d+"""))
       throw new ArgumentException("4th argument must be an integer.")
     if(!args(4).matches("""\d+"""))
@@ -71,7 +72,7 @@ object DataPreparer {
     val outputPath    = args(2)
     val minCount      = args(3).toInt
     val nbBuckets     = args(4).toInt
-
+    val createStats   = (args(5).equals("y"))
 
 
 
@@ -139,17 +140,19 @@ object DataPreparer {
     }.reduceByKey(_+_)
 
     //sum up partitionCounts for getting the global count:
-    val globalCountJsonString = partitionCount.map{case ((bucket, feature, language), count) => ((feature, language), count)}
-                                              .reduceByKey(_+_)
-                                              .filter(_._2 >= minCount)
-                                              .map{case ((feature, language), count) => {
-                                                import CountJsonProtocol._
-                                                import NumberIntJsonProtocol._
-                                                JsonCount(feature,
-                                                          language,
-                                                          JsonNumberInt(count.toString).toJson.asJsObject)
-                                                  .toJson.asJsObject.toString
-                                              }}
+    val globalCount = partitionCount.map{case ((bucket, feature, language), count) => ((feature, language), count)}
+                                    .reduceByKey(_+_)
+
+    val globalCountJsonString = globalCount.filter(_._2 >= minCount)
+                                           .map{case ((feature, language), count) => {
+                                             import CountJsonProtocol._
+                                             import NumberIntJsonProtocol._
+                                             JsonCount(feature,
+                                                       language,
+                                                       JsonNumberInt(count.toString).toJson.asJsObject)
+                                                         .toJson.asJsObject.toString
+                                           }}
+
 
     //transform partitionCount into JSON
     val partitionCountJsonString = partitionCount.filter(_._2 >= minCount).map{
@@ -177,6 +180,32 @@ object DataPreparer {
     }
 
 
+    //create some stats
+    if(createStats){
+
+      //count how many different features there are per count. (e.g. 500 different features have been counted 75 times)
+      val nbFeaturesPerCount = globalCount.map{case ((feature, language), count) => (count, 1)}
+                                          .reduceByKey(_+_)
+                                          .sortByKey(true)
+                                          .map{case (count, nbFeatures) => count +","+ nbFeatures}
+
+      nbFeaturesPerCount.saveAsTextFile(outputPath + "/stats/nbFeaturesPerCount")
+
+      //first give all elems the same key, then sum them all up
+      globalCount.map(c => ("all", c._2))
+                 .reduceByKey(_+_)
+                 .map(c => "total feature count: " + c._2)
+                 .saveAsTextFile(outputPath + "/stats/totalCount")
+
+      //get the most frequent features (dirty hack for saving as file in HDFS)
+      sc.parallelize(globalCount.map{case ((feature, language), count) => (count, (feature, language))}
+                                .takeOrdered(100)
+                                .map{case (count, (feature, language)) => feature +"("+ language +"),"+ count }
+                    ).saveAsTextFile(outputPath + "/stats/mostFrequent")
+
+
+
+    }
   }
 }
 
@@ -186,6 +215,7 @@ case class ArgumentException(cause:String)  extends Exception("ERROR: " + cause 
                                                                                     |         - arg1 = path/to/features
                                                                                     |         - arg2 = path/to/repoRank
                                                                                     |         - arg3 = path/to/bucket/output
-                                                                                    |         - arg4 = min counts (Integer)
+                                                                                    |         - arg4 = min count (Integer)
                                                                                     |         - arg5 = nbBuckets (Integer)
+                                                                                    |         - arg6 = 'y' if stats shall be created.
                                                                                   """.stripMargin)
