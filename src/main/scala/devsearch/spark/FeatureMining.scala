@@ -44,7 +44,7 @@ object FeatureMining {
       try {
         FeatureRecognizer(file)
       } catch {
-        case e: OutOfMemoryError => None
+        case e: OutOfMemoryError => throw new OutOfMemoryError("++++++Error here: " + file.location.toString)
       }
     }
   }

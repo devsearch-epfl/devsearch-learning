@@ -37,7 +37,7 @@ object AstExtractor {
                   new ContentsSource(uniqueOutputLocation, content.toString)
                 ))
               } catch {
-                case e: OutOfMemoryError => None
+                case e: OutOfMemoryError => throw new OutOfMemoryError("++++++Error here: " + metadata.location.toString)
               }
             case None => None
           }
