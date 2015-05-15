@@ -47,7 +47,8 @@ object CountJsonProtocol extends DefaultJsonProtocol {
  * - 1st argument is the input directory containing the feature files
  * - 2nd argument is the input directory containing the repoRank files
  * - 3rd argument is the output directory of the buckets
- * - 4th argument is the number of buckets
+ * - 4th argument is the minimum number of counts. Features with a lower count are not being saved in the featureCount.
+ * - 5th argument is the number of buckets
  */
  // Example:
  // spark-submit --num-executors 100 --class "devsearch.prepare.DataPreparer" --master yarn-client "devsearch-learning-assembly-0.1.jar" "/projects/devsearch/pwalch/features/*/*" "/projects/devsearch/ranking/*" "/projects/devsearch/JsonBuckets" 5
@@ -58,15 +59,19 @@ object DataPreparer {
   def main(args: Array[String]) {
 
     //some argument checking...
-    if(args.length != 4)
-      throw new ArgumentException("You need to enter 4 arguemnts, not " + args.length + ". ")
+    if(args.length != 5)
+      throw new ArgumentException("You need to enter 5 arguemnts, not " + args.length + ". ")
     if(!args(3).matches("""\d+"""))
       throw new ArgumentException("4th argument must be an integer.")
+    if(!args(4).matches("""\d+"""))
+      throw new ArgumentException("5th argument must be an integer.")
 
     val featureInput  = args(0)
     val repoRankInput = args(1)
     val outputPath    = args(2)
-    val nbBuckets     = args(3).toInt
+    val minCount      = args(3).toInt
+    val nbBuckets     = args(4).toInt
+
 
 
 
@@ -133,22 +138,21 @@ object DataPreparer {
       }
     }.reduceByKey(_+_)
 
-    
-
     //sum up partitionCounts for getting the global count:
-    val globalCountJsonString = partitionCount.groupBy{
-      case ((bucket, feature, language), count) => (feature, language)
-    }.map{
-      case ((feature, language), partitionCounts) => {
-        import CountJsonProtocol._
-        import NumberIntJsonProtocol._
-        val totCount = partitionCounts.foldLeft(0){case (acc, ((bucket, feature, language), count: Int)) => acc + count}
-        JsonCount(feature, language, JsonNumberInt(totCount.toString).toJson.asJsObject).toJson.asJsObject.toString
-      }
-    }
+    val globalCountJsonString = partitionCount.map{case ((bucket, feature, language), count) => ((feature, language), count)}
+                                              .reduceByKey(_+_)
+                                              .filter(_._2 >= minCount)
+                                              .map{case ((feature, language), count) => {
+                                                import CountJsonProtocol._
+                                                import NumberIntJsonProtocol._
+                                                JsonCount(feature,
+                                                          language,
+                                                          JsonNumberInt(count.toString).toJson.asJsObject)
+                                                  .toJson.asJsObject.toString
+                                              }}
 
     //transform partitionCount into JSON
-    val partitionCountJsonString = partitionCount.map{
+    val partitionCountJsonString = partitionCount.filter(_._2 >= minCount).map{
       case ((bucket, feature, language), count) =>
         import NumberIntJsonProtocol._
         import CountJsonProtocol._
@@ -178,10 +182,10 @@ object DataPreparer {
 
 
 //Thrown when arguments are somehow incorrect...
-case class ArgumentException(cause:String)  extends Exception("ERROR: " + cause + """
-    |        Correct usage:
-    |         - arg1 = path/to/features
-    |         - arg2 = path/to/repoRank
-    |         - arg4 = path/to/bucket/output
-    |         - arg3 = nbBuckets (Integer)
-  """.stripMargin)
+case class ArgumentException(cause:String)  extends Exception("ERROR: " + cause + """        Correct usage:
+                                                                                    |         - arg1 = path/to/features
+                                                                                    |         - arg2 = path/to/repoRank
+                                                                                    |         - arg3 = path/to/bucket/output
+                                                                                    |         - arg4 = min counts (Integer)
+                                                                                    |         - arg5 = nbBuckets (Integer)
+                                                                                  """.stripMargin)
