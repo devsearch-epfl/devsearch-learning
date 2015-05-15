@@ -199,9 +199,9 @@ object DataPreparer {
 
       //get the most frequent features (dirty hack for saving as file in HDFS)
       sc.parallelize(globalCount.map{case ((feature, language), count) => (count, (feature, language))}
-                                .takeOrdered(100)
+                                .takeOrdered(100)(Ordering[Int].reverse.on(_._1))
                                 .map{case (count, (feature, language)) => feature +"("+ language +"),"+ count }
-                    ).saveAsTextFile(outputPath + "/stats/mostFrequent")
+                    ).saveAsTextFile(outputPath + "/stats/top100")
 
 
 
