@@ -180,27 +180,31 @@ object DataPreparer {
     }
 
 
-    //create some stats
+    //create some statistics if wanted...
     if(createStats){
 
+      //merge languages. we don't need to separate between languages for the stats.
+      val globCountLangMerged = globalCount.map{case ((feature, language), count) => (feature, count)}
+                                           .reduceByKey(_+_)
+
       //count how many different features there are per count. (e.g. 500 different features have been counted 75 times)
-      val nbFeaturesPerCount = globalCount.map{case ((feature, language), count) => (count, 1)}
-                                          .reduceByKey(_+_)
-                                          .sortByKey(true)
-                                          .map{case (count, nbFeatures) => count +","+ nbFeatures}
+      val nbFeaturesPerCount = globCountLangMerged.map{case (feature, count) => (count, 1)}
+                                                  .reduceByKey(_+_)
+                                                  .sortByKey(true)
+                                                  .map{case (count, nbFeatures) => count +","+ nbFeatures}
 
       nbFeaturesPerCount.saveAsTextFile(outputPath + "/stats/nbFeaturesPerCount")
 
       //first give all elems the same key, then sum them all up
-      globalCount.map(c => ("all", c._2))
-                 .reduceByKey(_+_)
-                 .map(c => "total feature count: " + c._2)
-                 .saveAsTextFile(outputPath + "/stats/totalCount")
+      globCountLangMerged.map(c => ("all", c._2))
+                         .reduceByKey(_+_)
+                         .map(c => "total feature count: " + c._2)
+                         .saveAsTextFile(outputPath + "/stats/totalCount")
 
       //get the most frequent features (dirty hack for saving as file in HDFS)
-      sc.parallelize(globalCount.map{case ((feature, language), count) => (count, (feature, language))}
-                                .takeOrdered(100)(Ordering[Int].reverse.on(_._1))
-                                .map{case (count, (feature, language)) => feature +"("+ language +"),"+ count }
+      sc.parallelize(globCountLangMerged.map{case (feature, count) => (count, feature)}
+                                        .takeOrdered(100)(Ordering[Int].reverse.on(_._1))
+                                        .map{case (count, feature) => feature +","+ count}
                     ).saveAsTextFile(outputPath + "/stats/top100")
 
 
