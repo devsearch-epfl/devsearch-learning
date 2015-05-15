@@ -1,22 +1,32 @@
 devsearch-learning
 =======================================
 
-The FeatureMining class extracts features from tarballs using a Spark job.
+The FeatureMining class extracts features in row format from tarballs using a Spark job.
 
 # Extract features from tarballs
 
 * Generate and upload JAR file
-	* `sbt assembly`
-	* Rename the generated file to `learning.jar` 
+    * `sbt assembly`
+    * Rename the generated file to `learning.jar` 
 
 * Run Spark feature extractor
-    * `spark-submit --num-executors 25 --class devsearch.spark.FeatureMining --master yarn-client learning.jar "hdfs:///projects/devsearch/pwalch/tarballs" "hdfs:///projects/devsearch/pwalch/features/tarballs" "Devsearch_tarballs" > spark_tarballs.txt 2>&1`
+    * Make sure you have tarballs whose size is close to an HDFS block.
+    * Run this command (adapt arguments as you like) in a screen session:
+        * `spark-submit --num-executors 25 --class devsearch.spark.FeatureMining --master yarn-client learning.jar "hdfs:///projects/devsearch/pwalch/tarballs" "hdfs:///projects/devsearch/pwalch/features" "Devsearch_tarballs" > spark_tarballs.txt 2>&1`
 
-# Script usage to generate miniblobs (old format)
+# Split input
 
-The `splitter.pl` script splits the megablobs (650MB) from `devsearch-concat` into miniblobs (120MB) such that no file is shared by two parts.
+The input we received from DevMine contained mostly big files that don't fit in an HDFS block. Since our BlobInputFormat was developed as non-splittable, we needed to adapt the input by splitting it into smaller chunks.
 
-## Split DevMine data (megablobs) into smaller blobs (miniblobs)
+## Script to split big tarballs
+
+The `scripts/split-hdfs.sh` script splits the big tarballs (up to 5GB) we received from DevMine into smaller tarballs that fit in an HDFS block.
+
+This script downloads a big tarball from HDFS, splits it into smaller tarballs using a utility script, and uploads these smaller tarballs back to HDFS.
+
+## Script to split big text files of old format
+
+The `scripts/splitter.pl` script split one megablob (650MB) from `devsearch-concat` into many miniblobs (120MB) such that no file is shared by two parts.
 
 * Create a small folder architecture in your HOME:
     * `mkdir languages && cd languages`
