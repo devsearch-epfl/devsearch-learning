@@ -49,18 +49,18 @@ class SerializableHashRing(inputs: Seq[HashRingNode]) extends java.io.Serializab
     md5.update(input.getBytes)
     val digest = md5.digest()
     ByteBuffer.wrap(digest).getLong
-    /*
+/*
     val crc = new CRC32()
     crc.update(input.getBytes)
     crc.getValue
-    */
+*/
   }
 
   private def _generatePositions(node: HashRingNode): List[Long] = {
     val range = 1 to node.weight
 
     range.foldLeft(List[Long]()) { (memo, i) =>
-      this._stringToCRC(node.value + i.toString)  :: memo
+      this._stringToCRC(node.value + "_" +i.toString)  :: memo
     }
   }
 
