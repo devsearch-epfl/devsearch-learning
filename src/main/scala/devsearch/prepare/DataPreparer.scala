@@ -51,8 +51,8 @@ object CountJsonProtocol extends DefaultJsonProtocol {
  * - 5th argument is the number of buckets
  * - 6th argument tells if stats shall be created or not. ('Y' = define stats)
  */
- // Example:
- // spark-submit --num-executors 200 --class "devsearch.prepare.DataPreparer" --master yarn-client "devsearch-learning-assembly-0.1.jar" "/projects/devsearch/pwalch/features/*/*" "/projects/devsearch/ranking/*" "/projects/devsearch/testJsonBuckets" 3 5 y
+// Example:
+// spark-submit --num-executors 200 --class "devsearch.prepare.DataPreparer" --master yarn-client "devsearch-learning-assembly-0.1.jar" "/projects/devsearch/pwalch/features/dataset01/*/*,/projects/devsearch/pwalch/features/dataset02/*" "/projects/devsearch/ranking/*" "/projects/devsearch/testJsonBuckets" 100 5 y
 
 object DataPreparer {
 
@@ -86,8 +86,8 @@ object DataPreparer {
     val ring = new SerializableHashRing(buckets)
 
 
-    //read files
-    val features = sc.textFile(featureInput)
+    //read files (filter out duplicate features)
+    val features = sc.textFile(featureInput).distinct
     val ranks    = sc.textFile(repoRankInput)
 
 
@@ -141,17 +141,17 @@ object DataPreparer {
 
     //sum up partitionCounts for getting the global count:
     val globalCount = partitionCount.map{case ((bucket, feature, language), count) => ((feature, language), count)}
-                                    .reduceByKey(_+_)
+      .reduceByKey(_+_)
 
     val globalCountJsonString = globalCount.filter(_._2 >= minCount)
-                                           .map{case ((feature, language), count) => {
-                                             import CountJsonProtocol._
-                                             import NumberIntJsonProtocol._
-                                             JsonCount(feature,
-                                                       language,
-                                                       JsonNumberInt(count.toString).toJson.asJsObject)
-                                                         .toJson.asJsObject.toString
-                                           }}
+      .map{case ((feature, language), count) => {
+      import CountJsonProtocol._
+      import NumberIntJsonProtocol._
+      JsonCount(feature,
+        language,
+        JsonNumberInt(count.toString).toJson.asJsObject)
+        .toJson.asJsObject.toString
+    }}
 
 
     //transform partitionCount into JSON
@@ -185,27 +185,27 @@ object DataPreparer {
 
       //merge languages. we don't need to separate between languages for the stats.
       val globCountLangMerged = globalCount.map{case ((feature, language), count) => (feature, count)}
-                                           .reduceByKey(_+_)
+        .reduceByKey(_+_)
 
       //count how many different features there are per count. (e.g. 500 different features have been counted 75 times)
       val nbFeaturesPerCount = globCountLangMerged.map{case (feature, count) => (count, 1)}
-                                                  .reduceByKey(_+_)
-                                                  .sortByKey(true)
-                                                  .map{case (count, nbFeatures) => count +","+ nbFeatures}
+        .reduceByKey(_+_)
+        .sortByKey(true)
+        .map{case (count, nbFeatures) => count +","+ nbFeatures}
 
       nbFeaturesPerCount.saveAsTextFile(outputPath + "/stats/nbFeaturesPerCount")
 
       //first give all elems the same key, then sum them all up
       globCountLangMerged.map(c => ("all", c._2))
-                         .reduceByKey(_+_)
-                         .map(c => "total feature count: " + c._2)
-                         .saveAsTextFile(outputPath + "/stats/totalCount")
+        .reduceByKey(_+_)
+        .map(c => "total feature count: " + c._2)
+        .saveAsTextFile(outputPath + "/stats/totalCount")
 
       //get the most frequent features (dirty hack for saving as file in HDFS)
       sc.parallelize(globCountLangMerged.map{case (feature, count) => (count, feature)}
-                                        .takeOrdered(100)(Ordering[Int].reverse.on(_._1))
-                                        .map{case (count, feature) => feature +","+ count}
-                    ).saveAsTextFile(outputPath + "/stats/top100")
+        .takeOrdered(100)(Ordering[Int].reverse.on(_._1))
+        .map{case (count, feature) => feature +","+ count}
+      ).saveAsTextFile(outputPath + "/stats/top100")
 
 
 
