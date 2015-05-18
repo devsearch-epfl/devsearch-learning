@@ -13,9 +13,9 @@ case class JsonNumberInt(line: String)
 object NumberIntJsonProtocol extends DefaultJsonProtocol {
   implicit val jsonNumberFormat = jsonFormat(JsonNumberInt, "$numberInt")
 }
-case class JsonFeature(feature: String, file: String, line: JsObject)
+case class JsonFeature(feature: String, file: String, line: JsObject, repoRank: Double)
 object FeatureJsonProtocol extends DefaultJsonProtocol {
-  implicit val jsonFeatureFormat = jsonFormat3(JsonFeature)
+  implicit val jsonFeatureFormat = jsonFormat4(JsonFeature)
 }
 case class JsonRepoRank(ownerRepo: String, score: Double)
 object RepoRankJsonProtocol extends DefaultJsonProtocol {
@@ -50,9 +50,11 @@ object CountJsonProtocol extends DefaultJsonProtocol {
  * - 4th argument is the minimum number of counts. Features with a lower count are not being saved in the featureCount.
  * - 5th argument is the number of buckets
  * - 6th argument tells if stats shall be created or not. ('Y' = define stats)
+ *
+ * MAKE SURE to give the job enough resources!
  */
 // Example:
-// spark-submit --num-executors 200 --class "devsearch.prepare.DataPreparer" --master yarn-client "devsearch-learning-assembly-0.1.jar" "/projects/devsearch/pwalch/features/dataset01/*/*,/projects/devsearch/pwalch/features/dataset02/*" "/projects/devsearch/ranking/*" "/projects/devsearch/testJsonBuckets" 100 5 y
+// spark-submit --num-executors 340 --driver-memory 4g --executor-memory 4g --class "devsearch.prepare.DataPreparer" --master yarn-client "devsearch-learning-assembly-0.1.jar" "/projects/devsearch/pwalch/features/dataset01/*/*,/projects/devsearch/pwalch/features/dataset02/*" "/projects/devsearch/ranking/*" "/projects/devsearch/testJsonBuckets" 100 15 y
 
 object DataPreparer {
 
@@ -86,55 +88,54 @@ object DataPreparer {
     val ring = new SerializableHashRing(buckets)
 
 
-    //read files (filter out duplicate features)
+    //read files
     val features = sc.textFile(featureInput).distinct
     val ranks    = sc.textFile(repoRankInput)
 
 
-    //transform into JSON and assign each line to a bucket.
-    //The bucket is chosen according to ownerRepo.
-    val featuresJSON= features.map(Feature.parse(_)).collect{ case f if f.key.length < 512 => {
-      import NumberIntJsonProtocol._
-      val feature  = f.key
-      val owner    = f.pos.location.user
-      val repo     = f.pos.location.repoName
-      val file     = f.pos.location.fileName
-      val bucket   = ring.get(owner + "/" + repo).get
-      val jsonFeature = JsonFeature(
-        feature,
-        owner + "/" + repo + "/" + file,
-        JsonNumberInt(f.pos.line.toString).toJson.asJsObject
-      )
+    val ranksKVPair = ranks.map {r =>
+      val splitted = r.split(",")
+      (splitted(0), splitted(1).toDouble)
+    }.cache
 
-      (bucket, jsonFeature)
-    }}
+    //transform features into a key-value pair (filter out features whose key is too long. This makes Mongo crash.)
+    val featuresBucket = features.map(Feature.parse(_)).collect{case f if f.key.length < 512 => {
+      val feature   = f.key
+      val ownerRepo = f.pos.location.user +"/"+ f.pos.location.repoName
+      val file      = f.pos.location.fileName
+      val line      = f.pos.line.toString
 
-    //transform features into JSON
-    val featuresJsonString = featuresJSON.map{
-      import FeatureJsonProtocol._
-      f => (f._1, f._2.toJson.asJsObject.toString)
+      (ownerRepo, (ring.get(ownerRepo + "/" + file).get, file, line, feature))
+    }}.cache
+
+
+    //Join features with repoRank and transform them into JSON
+    //Since bucket 0 is always empty, only go from 1 to nbBuckets
+    for (i <- 1 to nbBuckets) {
+
+      //Set a high level of parallelism! otherwise the join will fail due to a OutOfMemoryError.
+      featuresBucket.filter(_._2._1 == "bucket" + i).leftOuterJoin(ranksKVPair, 20000).map{case (ownerRepo, ((bucket, file, line, feature), score)) =>
+        import NumberIntJsonProtocol._
+        import FeatureJsonProtocol._
+        val json = JsonFeature(feature,
+          ownerRepo +"/"+ file,
+          JsonNumberInt(line).toJson.asJsObject,
+          score.getOrElse(0.0)).toJson.asJsObject.toString
+        (bucket, json)
+      }.saveAsTextFile(outputPath + "/features/bucket" + i)
     }
 
 
 
-    //transform repoRank into JSON
-    val ranksJsonString = ranks.collect{
-      case r if r.takeWhile(_ != ',').length < 512 => {
-        val splitted = r.split(",")
-        import RepoRankJsonProtocol._
-        val jsonRepoRank = JsonRepoRank(splitted(0), splitted(1).toDouble).toJson.asJsObject.toString
 
-        (ring.get(splitted(0)).get, jsonRepoRank)
-      }
-    }
 
 
 
     //count the nb occurrences of each feature per language and bucket and create a JSON string:
     //first transform it into key-value pair, then sum up.
-    val partitionCount = featuresJSON.map{
-      case (bucket, JsonFeature(feature, ownerRepoFile, line)) => {
-        val language = ownerRepoFile.substring(ownerRepoFile.lastIndexOf('.') + 1)
+    val partitionCount = featuresBucket.map{
+      case (ownerRepo, (bucket, file, line, feature)) => {
+        val language = file.substring(file.lastIndexOf('.') + 1)
         ((bucket, feature, language), 1)
       }
     }.reduceByKey(_+_)
@@ -160,17 +161,6 @@ object DataPreparer {
         import NumberIntJsonProtocol._
         import CountJsonProtocol._
         (bucket, JsonCount(feature, language, JsonNumberInt(count.toString).toJson.asJsObject).toJson.asJsObject.toString)
-    }
-
-
-
-    //Since bucket 0 is always empty, only go from 1 to nbBuckets
-    for (i <- 1 to nbBuckets) {
-      featuresJsonString.filter(_._1 == "bucket" + i).map(_._2).saveAsTextFile(outputPath + "/features/bucket" + i)
-    }
-
-    for (i <- 1 to nbBuckets) {
-      ranksJsonString.filter(_._1 == "bucket" + i).map(_._2).saveAsTextFile(outputPath + "/repoRank/bucket" + i)
     }
 
     globalCountJsonString.saveAsTextFile(outputPath + "/globalCount")
@@ -214,7 +204,9 @@ object DataPreparer {
 }
 
 
-//Thrown when arguments are somehow incorrect...
+/**
+ * Thrown when arguments are somehow incorrect...
+ */
 case class ArgumentException(cause:String)  extends Exception("ERROR: " + cause + """        Correct usage:
                                                                                     |         - arg1 = path/to/features
                                                                                     |         - arg2 = path/to/repoRank
