@@ -53,4 +53,4 @@ The DataPreparer is used for joining the features with the repoRank, counting th
     * 5th argument is the number of buckets
     * 6th argument tells if stats shall be created or not. ('Y' = define stats)
 * Allocate enough resources to the job. We deal with a large amount of data and especially the join is extremely resource consuming!
--> Example: `spark-submit --num-executors 340 --driver-memory 4g --executor-memory 4g --class "devsearch.prepare.DataPreparer" --master yarn-client "devsearch-learning-assembly-0.1.jar" "/projects/devsearch/pwalch/features/dataset01/*/*,/projects/devsearch/pwalch/features/dataset02/*" "/projects/devsearch/ranking/*" "/projects/devsearch/testJsonBuckets" 100 15 y` 
+* Example: `spark-submit --num-executors 340 --driver-memory 4g --executor-memory 4g --class "devsearch.prepare.DataPreparer" --master yarn-client "devsearch-learning-assembly-0.1.jar" "/projects/devsearch/pwalch/features/dataset01/*/*,/projects/devsearch/pwalch/features/dataset02/*" "/projects/devsearch/ranking/*" "/projects/devsearch/testJsonBuckets" 100 15 y` 
