@@ -8,19 +8,27 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.io.Text
 
 object FeatureMining {
-  def mine(inputDir: String, outputDir: String, jobName: String) {
-    val conf = new SparkConf().setAppName(jobName).set("spark.executor.memory", "2g")
-    val sc = new SparkContext(conf)
-
-    // Recursively list files
+  def getFileList(inputDir: String): List[String] = {
     val fs = FileSystem.get(new java.net.URI(inputDir + "/*"), new Configuration())
-    val blobPathList = fs.listStatus(new Path(inputDir))
+    fs.listStatus(new Path(inputDir))
         // Language directories
         .map(_.getPath)
         // Files in the language directories
         .flatMap(p => fs.listStatus(p))
         .map(_.getPath.toString)
         .toList
+  }
+
+  def getSparkContext(jobName: String): SparkContext = {
+    val conf = new SparkConf().setAppName(jobName).set("spark.executor.memory", "2g")
+    new SparkContext(conf)
+  }
+
+  def mine(inputDir: String, outputDir: String, jobName: String) {
+    val sc = getSparkContext(jobName)
+
+    // Recursively list files
+    val blobPathList = getFileList(inputDir)
 
     val headerSnippetPairs = readInput(sc, blobPathList)
     val features = extractFeatures(headerSnippetPairs)
