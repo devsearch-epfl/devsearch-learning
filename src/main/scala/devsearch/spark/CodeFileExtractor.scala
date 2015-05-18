@@ -31,10 +31,14 @@ object AstExtractor {
           Languages.guess(metadata.location.fileName) match {
             case Some(language) =>
               val uniqueOutputLocation = metadata.location.toString
-              Some(CodeFile(
-                language, metadata.location,
-                new ContentsSource(uniqueOutputLocation, content.toString)
-              ))
+              try {
+                Some(CodeFile(
+                  language, metadata.location,
+                  new ContentsSource(uniqueOutputLocation, content.toString)
+                ))
+              } catch {
+                case e: OutOfMemoryError => throw new OutOfMemoryError("++++++Error here: " + metadata.location.toString)
+              }
             case None => None
           }
         case _ => None

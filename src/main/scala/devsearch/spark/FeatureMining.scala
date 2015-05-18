@@ -40,7 +40,13 @@ object FeatureMining {
     val codeFiles = AstExtractor.extract(headerSnippetPairs)
 
     // Extract features from ASTs return them
-    codeFiles.flatMap(FeatureRecognizer)
+    codeFiles.flatMap { file =>
+      try {
+        FeatureRecognizer(file)
+      } catch {
+        case e: OutOfMemoryError => throw new OutOfMemoryError("++++++Error here: " + file.location.toString)
+      }
+    }
   }
 
   /**
