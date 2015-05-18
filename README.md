@@ -38,7 +38,6 @@ The `splitter.pl` script splits the megablobs (650MB) from `devsearch-concat` in
     * `hadoop fs -mkdir /projects/devsearch/pwalch/usable_repos/java`
     * `hadoop fs -put miniblobs/part-* /projects/devsearch/pwalch/usable_repos/java`
 
-===================================================================================
 
 # DataPreparer
 The DataPreparer is used for joining the features with the repoRank, counting the features, convert everything into JSON and split it into different buckets. Further it generates some stats if wished. 
