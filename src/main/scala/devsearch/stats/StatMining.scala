@@ -3,7 +3,7 @@ package devsearch.stats
 import devsearch.spark.{HeaderParser, FeatureMining}
 import org.apache.hadoop.io.Text
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{SparkContext, SparkConf}
+import org.apache.spark.SparkContext
 
 object StatMining {
   def readInput(sc: SparkContext, files: List[String]): RDD[(Text, Text)] = {
@@ -31,18 +31,18 @@ object StatMining {
     val sc = FeatureMining.getSparkContext(jobName)
     val fileList = FeatureMining.getFileList(inputDirNoSlash)
     val blobs: RDD[(Text, Text)] = readInput(sc, fileList)
-    blobs.keys.flatMap { headerLine =>
+    val locations = blobs.keys.flatMap { headerLine =>
       val result = HeaderParser.parse(HeaderParser.parseBlobHeader, headerLine.toString)
       result match {
         case HeaderParser.Success(metadata, n) =>
-          metadata.location.toString
+          List(metadata.location.toString)
 
         case _ =>
-          None
+          List()
       }
     }
 
-    blobs.saveAsTextFile(outputDir)
+    locations.saveAsTextFile(outputDir)
 
     println("Mining done")
   }
