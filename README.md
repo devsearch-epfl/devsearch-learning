@@ -41,6 +41,7 @@ The `splitter.pl` script splits the megablobs (650MB) from `devsearch-concat` in
 
 # DataPreparer
 The DataPreparer is used for joining the features with the repoRank, counting the features, convert everything into JSON and split it into different buckets. Further it generates some stats if wished. 
+The script generates directories in the specified output directory and saves the output there.
 
 ## Usage
 
