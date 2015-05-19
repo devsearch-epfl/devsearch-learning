@@ -24,6 +24,7 @@ class BlobReader extends RecordReader[Text, Text] {
   var key = new Text("")
   var currentBlobSnippet = new Text("")
   var processed = false
+  var savedPath: String = _
 
   var tarInput: ArchiveInputStream = _
 
@@ -34,6 +35,7 @@ class BlobReader extends RecordReader[Text, Text] {
   override def initialize(split: InputSplit, context: TaskAttemptContext): Unit = {
     val firstSplit = split.asInstanceOf[FileSplit]
     val path = firstSplit.getPath
+    savedPath = path.toString
     val fileSystem = path.getFileSystem(context.getConfiguration())
 
     tarInput = new ArchiveStreamFactory().createArchiveInputStream(ArchiveStreamFactory.TAR, new BufferedInputStream(fileSystem.open(path)));

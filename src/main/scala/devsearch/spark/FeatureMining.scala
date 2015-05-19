@@ -20,7 +20,7 @@ object FeatureMining {
   }
 
   def getSparkContext(jobName: String): SparkContext = {
-    val conf = new SparkConf().setAppName(jobName).set("spark.executor.memory", "2g")
+    val conf = new SparkConf().setAppName(jobName)
     new SparkContext(conf)
   }
 

@@ -1,5 +1,7 @@
 package devsearch.stats
 
+import java.io.IOException
+
 import devsearch.parsers.Languages
 import devsearch.spark.BlobReader
 import org.apache.hadoop.fs.Path
@@ -19,15 +21,19 @@ class BlobHeaderInputFormat extends FileInputFormat[Text, Text] {
 
 class BlobHeaderReader extends BlobReader {
   override def nextKeyValue(): Boolean = {
-    val entry = tarInput.getNextEntry
-    if (entry == null) {
-      processed = true
-    } else {
-      val fileName = entry.getName
-      if (Languages.isFileSupported(fileName)) {
-        key.set(fileName)
-        currentBlobSnippet.set("")
+    try {
+      val entry = tarInput.getNextEntry
+      if (entry == null) {
+        processed = true
+      } else {
+        val fileName = entry.getName
+        if (Languages.isFileSupported(fileName)) {
+          key.set(fileName)
+          currentBlobSnippet.set("")
+        }
       }
+    } catch {
+      case e: IOException => throw new IOException("++++++Error here: when reading file: " + savedPath)
     }
 
     val hasPairBeenFound = !processed
