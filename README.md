@@ -47,3 +47,21 @@ The `scripts/splitter.pl` script split one megablob (650MB) from `devsearch-conc
 * Put files back on HDFS
     * `hadoop fs -mkdir /projects/devsearch/pwalch/usable_repos/java`
     * `hadoop fs -put miniblobs/part-* /projects/devsearch/pwalch/usable_repos/java`
+
+
+# DataPreparer
+The DataPreparer is used for joining the features with the repoRank, counting the features, convert everything into JSON and split it into different buckets. Further it generates some stats if wished. 
+The script generates directories in the specified output directory and saves the output there.
+
+## Usage
+
+* Use `learning.jar` (generated as discribed above)
+* The DataPreparer is executed with the following arguments:
+    * 1st argument is the input directory containing the feature files
+    * 2nd argument is the input directory containing the repoRank files
+    * 3rd argument is the output directory of the buckets
+    * 4th argument is the minimum number of counts. Features with a lower count are not being saved in the featureCount.
+    * 5th argument is the number of buckets
+    * 6th argument tells if stats shall be created or not. ('Y' = define stats)
+* Allocate enough resources to the job. We deal with a large amount of data and especially the join is extremely resource consuming!
+* Example: `spark-submit --num-executors 340 --driver-memory 4g --executor-memory 4g --class "devsearch.prepare.DataPreparer" --master yarn-client "devsearch-learning-assembly-0.1.jar" "/projects/devsearch/pwalch/features/dataset01/*/*,/projects/devsearch/pwalch/features/dataset02/*" "/projects/devsearch/ranking/*" "/projects/devsearch/testJsonBuckets" 100 15 y` 
