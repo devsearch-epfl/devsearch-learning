@@ -26,6 +26,8 @@ object CountJsonProtocol extends DefaultJsonProtocol {
   implicit val jsonCountFormate = jsonFormat3(JsonCount)
 }
 
+case class FileIndex(partitionIndex: Int, innerIndex: Int)
+
 
 
 /**
@@ -109,21 +111,61 @@ object DataPreparer {
     }}.cache
 
 
+    // yields a (fileIndex, featureContent) RDD
+    // where fileIndex is composed of two integers and is unique per repository
+    // some repositories might have duplicated index if features from the same file are split on several spark partitions
+    val fileIndexed = featuresBucket
+
+      // transform our features in a more usable way
+      .map{case (repo, (bucket, file, line, feature)) => (repo + "/" + file, bucket, line, feature, repo, file)}
+
+      // we sort all features by full github path file
+      .sortBy((featureEntity) => featureEntity._1)
+
+      // we map each spark partition to a unique index
+      .mapPartitionsWithIndex((partitionIndex, featureEntityIterator) => {
+
+        var idx = 0
+        val lastElement = ""
+
+        // each
+        featureEntityIterator.map((featureEntity) => {
+          if (lastElement != featureEntity._1)
+            idx = 1 + idx
+
+          (FileIndex(partitionIndex, idx), featureEntity)
+        })
+      })
+
+    print(fileIndexed.toDebugString)
+
+
+    // we extract the fileIndex from what we just built
+    val fileIndex = fileIndexed
+      .map{case (index: FileIndex, featureEntity) => (index, featureEntity._1)}
+      .distinct()
+
+    fileIndexed.saveAsTextFile(outputPath + "/normalized/features")
+    fileIndex.saveAsTextFile(outputPath + "/normalized/index")
+
+
+
+
     //Join features with repoRank and transform them into JSON
     //Since bucket 0 is always empty, only go from 1 to nbBuckets
-    for (i <- 1 to nbBuckets) {
-
-      //Set a high level of parallelism! otherwise the join will fail due to a OutOfMemoryError.
-      featuresBucket.filter(_._2._1 == "bucket" + i).leftOuterJoin(ranksKVPair, 20000).map{case (ownerRepo, ((bucket, file, line, feature), score)) =>
-        import NumberIntJsonProtocol._
-        import FeatureJsonProtocol._
-        val json = JsonFeature(feature,
-          ownerRepo +"/"+ file,
-          JsonNumberInt(line).toJson.asJsObject,
-          score.getOrElse(0.0)).toJson.asJsObject.toString
-        (bucket, json)
-      }.saveAsTextFile(outputPath + "/features/bucket" + i)
-    }
+//    for (i <- 1 to nbBuckets) {
+//
+//      //Set a high level of parallelism! otherwise the join will fail due to a OutOfMemoryError.
+//      featuresBucket.filter(_._2._1 == "bucket" + i).leftOuterJoin(ranksKVPair, 100).map{case (ownerRepo, ((bucket, file, line, feature), score)) =>
+//        import NumberIntJsonProtocol._
+//        import FeatureJsonProtocol._
+//        val json = JsonFeature(feature,
+//          ownerRepo +"/"+ file,
+//          JsonNumberInt(line).toJson.asJsObject,
+//          score.getOrElse(0.0)).toJson.asJsObject.toString
+//        (bucket, json)
+//      }.saveAsTextFile(outputPath + "/features/bucket" + i)
+//    }
 
 
 
@@ -133,73 +175,73 @@ object DataPreparer {
 
     //count the nb occurrences of each feature per language and bucket and create a JSON string:
     //first transform it into key-value pair, then sum up.
-    val partitionCount = featuresBucket.map{
-      case (ownerRepo, (bucket, file, line, feature)) => {
-        val language = file.substring(file.lastIndexOf('.') + 1)
-        ((bucket, feature, language), 1)
-      }
-    }.reduceByKey(_+_)
-
-    //sum up partitionCounts for getting the global count:
-    val globalCount = partitionCount.map{case ((bucket, feature, language), count) => ((feature, language), count)}
-      .reduceByKey(_+_)
-
-    val globalCountJsonString = globalCount.filter(_._2 >= minCount)
-      .map{case ((feature, language), count) => {
-      import CountJsonProtocol._
-      import NumberIntJsonProtocol._
-      JsonCount(feature,
-        language,
-        JsonNumberInt(count.toString).toJson.asJsObject)
-        .toJson.asJsObject.toString
-    }}
-
-
-    //transform partitionCount into JSON
-    val partitionCountJsonString = partitionCount.filter(_._2 >= minCount).map{
-      case ((bucket, feature, language), count) =>
-        import NumberIntJsonProtocol._
-        import CountJsonProtocol._
-        (bucket, JsonCount(feature, language, JsonNumberInt(count.toString).toJson.asJsObject).toJson.asJsObject.toString)
-    }
-
-    globalCountJsonString.saveAsTextFile(outputPath + "/globalCount")
-
-    for (i <- 1 to nbBuckets) {
-      partitionCountJsonString.filter(_._1 == "bucket" + i).map(_._2).saveAsTextFile(outputPath + "/partitionCounts/bucket" + i)
-    }
-
-
-    //create some statistics if wanted...
-    if(createStats){
-
-      //merge languages. we don't need to separate between languages for the stats.
-      val globCountLangMerged = globalCount.map{case ((feature, language), count) => (feature, count)}
-        .reduceByKey(_+_)
-
-      //count how many different features there are per count. (e.g. 500 different features have been counted 75 times)
-      val nbFeaturesPerCount = globCountLangMerged.map{case (feature, count) => (count, 1)}
-        .reduceByKey(_+_)
-        .sortByKey(true)
-        .map{case (count, nbFeatures) => count +","+ nbFeatures}
-
-      nbFeaturesPerCount.saveAsTextFile(outputPath + "/stats/nbFeaturesPerCount")
-
-      //first give all elems the same key, then sum them all up
-      globCountLangMerged.map(c => ("all", c._2))
-        .reduceByKey(_+_)
-        .map(c => "total feature count: " + c._2)
-        .saveAsTextFile(outputPath + "/stats/totalCount")
-
-      //get the most frequent features (dirty hack for saving as file in HDFS)
-      sc.parallelize(globCountLangMerged.map{case (feature, count) => (count, feature)}
-        .takeOrdered(100)(Ordering[Int].reverse.on(_._1))
-        .map{case (count, feature) => feature +","+ count}
-      ).saveAsTextFile(outputPath + "/stats/top100")
-
-
-
-    }
+//    val partitionCount = featuresBucket.map{
+//      case (ownerRepo, (bucket, file, line, feature)) => {
+//        val language = file.substring(file.lastIndexOf('.') + 1)
+//        ((bucket, feature, language), 1)
+//      }
+//    }.reduceByKey(_+_)
+//
+//    //sum up partitionCounts for getting the global count:
+//    val globalCount = partitionCount.map{case ((bucket, feature, language), count) => ((feature, language), count)}
+//      .reduceByKey(_+_)
+//
+//    val globalCountJsonString = globalCount.filter(_._2 >= minCount)
+//      .map{case ((feature, language), count) => {
+//      import CountJsonProtocol._
+//      import NumberIntJsonProtocol._
+//      JsonCount(feature,
+//        language,
+//        JsonNumberInt(count.toString).toJson.asJsObject)
+//        .toJson.asJsObject.toString
+//    }}
+//
+//
+//    //transform partitionCount into JSON
+//    val partitionCountJsonString = partitionCount.filter(_._2 >= minCount).map{
+//      case ((bucket, feature, language), count) =>
+//        import NumberIntJsonProtocol._
+//        import CountJsonProtocol._
+//        (bucket, JsonCount(feature, language, JsonNumberInt(count.toString).toJson.asJsObject).toJson.asJsObject.toString)
+//    }
+//
+//    globalCountJsonString.saveAsTextFile(outputPath + "/globalCount")
+//
+//    for (i <- 1 to nbBuckets) {
+//      partitionCountJsonString.filter(_._1 == "bucket" + i).map(_._2).saveAsTextFile(outputPath + "/partitionCounts/bucket" + i)
+//    }
+//
+//
+//    //create some statistics if wanted...
+//    if(createStats){
+//
+//      //merge languages. we don't need to separate between languages for the stats.
+//      val globCountLangMerged = globalCount.map{case ((feature, language), count) => (feature, count)}
+//        .reduceByKey(_+_)
+//
+//      //count how many different features there are per count. (e.g. 500 different features have been counted 75 times)
+//      val nbFeaturesPerCount = globCountLangMerged.map{case (feature, count) => (count, 1)}
+//        .reduceByKey(_+_)
+//        .sortByKey(true)
+//        .map{case (count, nbFeatures) => count +","+ nbFeatures}
+//
+//      nbFeaturesPerCount.saveAsTextFile(outputPath + "/stats/nbFeaturesPerCount")
+//
+//      //first give all elems the same key, then sum them all up
+//      globCountLangMerged.map(c => ("all", c._2))
+//        .reduceByKey(_+_)
+//        .map(c => "total feature count: " + c._2)
+//        .saveAsTextFile(outputPath + "/stats/totalCount")
+//
+//      //get the most frequent features (dirty hack for saving as file in HDFS)
+//      sc.parallelize(globCountLangMerged.map{case (feature, count) => (count, feature)}
+//        .takeOrdered(100)(Ordering[Int].reverse.on(_._1))
+//        .map{case (count, feature) => feature +","+ count}
+//      ).saveAsTextFile(outputPath + "/stats/top100")
+//
+//
+//
+//    }
   }
 }
 
