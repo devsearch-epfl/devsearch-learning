@@ -26,8 +26,6 @@ object CountJsonProtocol extends DefaultJsonProtocol {
   implicit val jsonCountFormate = jsonFormat3(JsonCount)
 }
 
-case class FileIndex(partitionIndex: Int, innerIndex: Int)
-
 
 
 /**
@@ -114,38 +112,32 @@ object DataPreparer {
     // yields a (fileIndex, featureContent) RDD
     // where fileIndex is composed of two integers and is unique per repository
     // some repositories might have duplicated index if features from the same file are split on several spark partitions
-    val fileIndexed = featuresBucket
+    val featuresWithUID = featuresBucket
 
       // transform our features in a more usable way
       .map{case (repo, (bucket, file, line, feature)) => (repo + "/" + file, bucket, line, feature, repo, file)}
 
       // we sort all features by full github path file
-      .sortBy((featureEntity) => featureEntity._1)
+      .groupBy((featureEntity) => featureEntity._1)
 
-      // we map each spark partition to a unique index
-      .mapPartitionsWithIndex((partitionIndex, featureEntityIterator) => {
+      .zipWithUniqueId()
 
-        var idx = 0
-        val lastElement = ""
+      .map{ case ((absolutePath: String, features), fileId: Long) =>
+        (fileId, absolutePath, features)}
 
-        // each
-        featureEntityIterator.map((featureEntity) => {
-          if (lastElement != featureEntity._1)
-            idx = 1 + idx
+    val newFeaturesWithUID = featuresWithUID
+      .flatMap{ case (id, absolutePath, features) =>
+        features.map{ case (_, bucket, line, feature, repo, file) =>
+          (id, absolutePath, bucket, line, feature, repo, file)}}
 
-          (FileIndex(partitionIndex, idx), featureEntity)
-        })
-      })
+    val fileIndex = featuresWithUID
+      .map{ case (id, absolutePath, features) =>
+        (id, absolutePath)}
 
-    print(fileIndexed.toDebugString)
+    print(newFeaturesWithUID.toDebugString)
+    print(fileIndex.toDebugString)
 
-
-    // we extract the fileIndex from what we just built
-    val fileIndex = fileIndexed
-      .map{case (index: FileIndex, featureEntity) => (index, featureEntity._1)}
-      .distinct()
-
-    fileIndexed.saveAsTextFile(outputPath + "/normalized/features")
+    newFeaturesWithUID.saveAsTextFile(outputPath + "/normalized/features")
     fileIndex.saveAsTextFile(outputPath + "/normalized/index")
 
 
